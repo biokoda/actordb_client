@@ -1,0 +1,12 @@
+{application, actordb_client,
+ [
+  {description, ""},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {mod, { actordb_client_app, []}},
+  {env, []}
+ ]}.
