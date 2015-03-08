@@ -1,55 +1,87 @@
 -module(actordb_client).
 -compile([{parse_transform, lager_transform}]).
 % API
--export([test/0,start/1, login/3, exec/4, exec/5, exec_multi/4,exec_multi/5, exec_all/3, exec_all/4, exec/2]).
+-export([test/0, start/2, start/1, 
+	login/2, login/3, 
+	exec/4, exec/5, 
+	exec_multi/4,exec_multi/5, 
+	exec_all/3, exec_all/4, 
+	exec/1,exec/2]).
 -behaviour(gen_server).
 -behaviour(poolboy_worker).
 -export([start_link/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
          code_change/3]).
 
+% Usage example
 test() ->
-	PoolInfo = [{size, 10}, {max_overflow, 20}],
-	WorkerInfo = [{hostname, "127.0.0.1"},
+	PoolInfo = [{size, 10}, {max_overflow, 5}],
+	% Single host in worker params. Every worker in pool will connect to it.
+	WorkerParams = [{hostname, "127.0.0.1"},
         % {database, "db1"},
         {username, "db1"},
         {password, "abc123"},
         {port,33306}
     ],
-	start([{pool,PoolInfo,WorkerInfo}]).
+    % Multiple hosts in worker params. Every worker will pick one random host and connect to that.
+    % If connection to DB is lost, it will try to find a working host.
+    % WorkerParams = 
+    % [
+    %    [
+    %      {hostname, "192.168.1.2"},
+    %      {username, "db1"},
+    %      {password, "abc123"},
+    %      {port,33306}
+    %    ],
+    %    [
+    %      {hostname, "192.168.1.3"},
+    %      {username, "db1"},
+    %      {password, "abc123"},
+    %      {port,33306}
+    %    ]
+    % ],
+	start(PoolInfo,WorkerParams).
 
-% [{PoolName,PoolParams,WorkerParams}]
-start([_|_] = Pools) ->
+% Single pool is most likely sufficient for most situations. 
+% WorkerParams can be a single property list (connect to one host)
+% or a list of property lists (worker randomly connects to one of the hosts). 
+start(PoolParams,WorkerParams) ->
+	start([{default_pool,PoolParams,WorkerParams}]).
+start([{_Poolname,_PoolParams, _WorkerParams}|_] =  Pools) ->
 	ok = application:set_env(actordb_client, pools,Pools),
 	application:start(?MODULE).
 
 
+login(U,P) ->
+	login(default_pool,U,P).
 login(PoolName,U,P) ->
 	poolboy:transaction(PoolName, fun(Worker) ->
         gen_server:call(Worker, {call, login, [U,P]})
     end).
 
-exec(PoolName,Actor,Type,Sql) ->
-	exec(PoolName,Actor,Type,Sql,[]).
+exec(Actor,Type,Sql,Flags) ->
+	exec(default_pool,Actor,Type,Sql,Flags).
 exec(PoolName,Actor,Type,Sql,Flags) ->
 	poolboy:transaction(PoolName, fun(Worker) ->
         gen_server:call(Worker, {call, exec_single, [Actor,Type,Sql,Flags]})
     end).
 
-exec_multi(PoolName,Actors, Type, Sql) ->
-	exec_multi(PoolName,Actors,Type,Sql,[]).
+exec_multi(Actors, Type, Sql,Flags) ->
+	exec_multi(default_pool,Actors,Type,Sql,Flags).
 exec_multi(PoolName,[_|_] = Actors, Type, Sql, Flags) ->
 	poolboy:transaction(PoolName, fun(Worker) ->
         gen_server:call(Worker, {call, exec_multi, [Actors,Type,Sql,Flags]})
     end).
 
-exec_all(PoolName,Type,Sql) ->
-	exec_all(PoolName,Type,Sql,[]).
+exec_all(Type,Sql,Flags) ->
+	exec_all(default_pool,Type,Sql,Flags).
 exec_all(PoolName,Type,Sql,Flags) ->
 	poolboy:transaction(PoolName, fun(Worker) ->
         gen_server:call(Worker, {call, exec_all, [Type,Sql,Flags]})
     end).
 
+exec(Sql) ->
+	exec(default_pool,Sql).
 exec(PoolName,Sql) ->
 	poolboy:transaction(PoolName, fun(Worker) ->
         gen_server:call(Worker, {call, exec_sql, [Sql]})
@@ -57,37 +89,133 @@ exec(PoolName,Sql) ->
 
 
 
--record(dp, {conn, username, password}).
+-record(dp, {conn, hostinfo = [], otherhosts = [], callqueue, tryconn}).
 
 start_link(Args) ->
     gen_server:start_link(?MODULE, Args, []).
 
 init(Args) ->
     % process_flag(trap_exit, true),
-    Hostname = proplists:get_value(hostname, Args),
-    % Database = proplists:get_value(database, Args),
-    Username = proplists:get_value(username, Args),
-    Password = proplists:get_value(password, Args),
-    Port = proplists:get_value(port, Args),
-    
-    {ok,C} = thrift_client_util:new(Hostname, Port, adbt_thrift, []),
-    {C1,_R} = thrift_client:call(C, login, [Username,Password]),
-    {ok, #dp{conn=C1, username = Username, password = Password}}.
+    random:seed(now()),
+    case Args of
+    	[{_,_}|_] = Props ->
+    		ok;
+    	[[{_,_}|_]|_] ->
+    		Props = randelem(Args)
+    end,
+    {ok,C1} = do_connect(Props),
+    {ok, #dp{conn=C1, hostinfo = Props, otherhosts = Args -- [Props], callqueue = queue:new()}}.
 
+handle_call(_Msg, _From, #dp{conn = undefined} = P) ->
+	% We might delay response a bit for max 1s to see if we can reconnect?
+	{reply,{error,closed},P};
+	% {noreply,P#dp{callqueue = queue:in_r({From,Msg},P#dp.callqueue)}};
 handle_call({call, Func,Params}, _From, P) ->
-	{C,R} = thrift_client:call(P#dp.conn, Func, Params),
-    {reply, R, P#dp{conn = C}}.
+	Result = (catch thrift_client:call(P#dp.conn, Func, Params)),
+	case Result of
+		{C,{ok, Reply}} ->
+			{reply, {ok, Reply}, P#dp{conn = C}};
+		{C,{exception,Msg}} ->
+			{reply, {ok, Msg}, P#dp{conn = C}};
+		{_,{error,Msg}} when Msg == closed; Msg == econnrefused ->
+			(catch thrift_client:close(P#dp.conn)),
+			self() ! reconnect,
+			% lager:error("Connection lost to ~p",[proplists:get_value(hostname, P#dp.hostinfo)]),
+			{reply,{error,Msg},P#dp{conn = undefined}};
+		{_, {E, Msg}} when E == error ->
+			(catch thrift_client:close(P#dp.conn)),
+			self() ! reconnect,
+			{reply,{E, Msg}, P#dp{conn = undefined}};
+		Other ->
+			(catch thrift_client:close(P#dp.conn)),
+			self() ! reconnect,
+			{reply, Other, P#dp{conn = undefined}}
+	end.
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-handle_info(_Info, State) ->
-    {noreply, State}.
+handle_info(reconnect,#dp{conn = undefined} = P) ->
+	{ok,C} = do_connect(P#dp.hostinfo),
+	{noreply,P#dp{conn = C}};
+handle_info(reconnect,P) ->
+	(catch thrift_client:close(P#dp.conn)),
+	handle_info(reconnect,P#dp{conn = undefined});
+handle_info(connect_other,#dp{otherhosts = []} = P) ->
+	erlang:send_after(500,self(),reconnect),
+	{noreply,P};
+handle_info(connect_other, #dp{conn = undefined} = P) ->
+	Props = randelem(P#dp.otherhosts),
+	case do_connect(Props) of
+		{ok,undefined} ->
+			% Cant connect to other host. Wait a bit and
+			% start again with our assigned host.
+			erlang:send_after(500,self(),reconnect),
+			{noreply,P};
+		{ok,C} ->
+			% We found a new connection to some other host.
+			% Still periodically try to reconnect to original host if it comes back up.
+			{noreply,P#dp{conn = C, tryconn = tryconn(P#dp.hostinfo)}}
+	end;
+handle_info(connect_other,P) ->
+	(catch thrift_client:close(P#dp.conn)),
+	handle_info(connect_other,P#dp{conn = undefined});
+handle_info({'DOWN',_Monitor,_,Pid,Reason}, #dp{tryconn = Pid} = P) ->
+	case Reason of
+		{ok,C} when C /= undefined ->
+			% Original host seems to be up,
+			handle_info(reconnect,P);
+		_ ->
+			{noreply, P#dp{tryconn = tryconn(P#dp.hostinfo)}}
+	end.
 
 terminate(_Reason, P) ->
-	thrift_client:close(P#dp.conn),
+	(catch thrift_client:close(P#dp.conn)),
     ok.
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
+
+tryconn(Props) ->
+	{Pid,_} = spawn_monitor(fun() ->
+		timer:sleep(1000),
+		exit(do_connect(Props))
+	end),
+	Pid.
+% Return {ok,Connection} if ok.
+% If connection closed retry later.
+% If some other error (like invalid login info) throw exception
+do_connect(Props) ->
+	Hostname = proplists:get_value(hostname, Props),
+    % Database = proplists:get_value(database, Args),
+    Username = proplists:get_value(username, Props),
+    Password = proplists:get_value(password, Props),
+    Port = proplists:get_value(port, Props),
+    
+    case catch thrift_client_util:new(Hostname, Port, adbt_thrift, []) of
+    	{ok,C} ->
+    		case catch thrift_client:call(C, login, [Username,Password]) of
+    			{C1,{ok,_}} ->
+    				{ok,C1};
+    			{_,{error,Err}} when Err == closed; Err == econnrefused ->
+    				self() ! connect_other,
+    				{ok,undefined};
+    			{_,{exception,Msg}} ->
+    				throw(Msg);
+    			{_,Err} ->
+    				throw(Err)
+    		end;
+    	{_,{error,Err}} when Err == closed; Err == econnrefused ->
+    		self() ! connect_other,
+    		{ok,undefined}
+    end.
+
+randelem(Args) ->
+	case lists:keyfind(crypto,1,application:which_applications()) of
+		false ->
+			Num = random:uniform(1000000);
+		_ ->
+			Num = binary:first(crypto:rand_bytes(1))
+	end,
+    lists:nth((Num rem length(Args)) + 1,Args).
