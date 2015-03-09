@@ -3,9 +3,9 @@
 % file, You can obtain one at http://mozilla.org/MPL/2.0/.
 -module(actordb_client).
 -compile([{parse_transform, lager_transform}]).
+-include("adbt_types.hrl").
 % API
 -export([test/0, start/2, start/1, 
-	login/2, login/3, 
 	exec/4, exec/5, 
 	exec_multi/4,exec_multi/5, 
 	exec_all/3, exec_all/4, 
@@ -55,41 +55,70 @@ start([{_Poolname,_PoolParams, _WorkerParams}|_] =  Pools) ->
 	application:start(?MODULE).
 
 
-login(U,P) ->
-	login(default_pool,U,P).
-login(PoolName,U,P) ->
-	poolboy:transaction(PoolName, fun(Worker) ->
-        gen_server:call(Worker, {call, login, [U,P]})
-    end).
-
 exec(Actor,Type,Sql,Flags) ->
 	exec(default_pool,Actor,Type,Sql,Flags).
 exec(PoolName,Actor,Type,Sql,Flags) ->
-	poolboy:transaction(PoolName, fun(Worker) ->
+	R = poolboy:transaction(PoolName, fun(Worker) ->
         gen_server:call(Worker, {call, exec_single, [Actor,Type,Sql,Flags]})
-    end).
+    end),
+    resp(R).
 
 exec_multi(Actors, Type, Sql,Flags) ->
 	exec_multi(default_pool,Actors,Type,Sql,Flags).
 exec_multi(PoolName,[_|_] = Actors, Type, Sql, Flags) ->
-	poolboy:transaction(PoolName, fun(Worker) ->
+	R = poolboy:transaction(PoolName, fun(Worker) ->
         gen_server:call(Worker, {call, exec_multi, [Actors,Type,Sql,Flags]})
-    end).
+    end),
+    resp(R).
 
 exec_all(Type,Sql,Flags) ->
 	exec_all(default_pool,Type,Sql,Flags).
 exec_all(PoolName,Type,Sql,Flags) ->
-	poolboy:transaction(PoolName, fun(Worker) ->
+	R = poolboy:transaction(PoolName, fun(Worker) ->
         gen_server:call(Worker, {call, exec_all, [Type,Sql,Flags]})
-    end).
+    end),
+    resp(R).
 
 exec(Sql) ->
 	exec(default_pool,Sql).
 exec(PoolName,Sql) ->
-	poolboy:transaction(PoolName, fun(Worker) ->
+	R = poolboy:transaction(PoolName, fun(Worker) ->
         gen_server:call(Worker, {call, exec_sql, [Sql]})
-    end).
+    end),
+    resp(R).
 
+resp({ok,R}) ->
+	{ok,resp(R)};
+resp([M|T]) when is_map(M) ->
+	[resp(X) || X <- [M|T]];
+resp(M) when is_map(M) ->
+	maps:from_list([{binary_to_atom(K,latin1),resp(V)} || {K,V} <- maps:to_list(M)]);
+resp(#'Val'{bigint = V}) when is_integer(V) ->
+	V;
+resp(#'Val'{integer = V}) when is_integer(V) ->
+	V;
+resp(#'Val'{smallint = V}) when is_integer(V) ->
+	V;
+resp(#'Val'{real = V}) when is_float(V) ->
+	V;
+resp(#'Val'{bval = V}) when V == true; V == false ->
+	V;
+resp(#'Val'{text = V}) when is_binary(V); is_list(V) ->
+	V;
+resp(#'Val'{isnull = 1}) ->
+	undefined;
+resp(#'Result'{read = undefined, write = Write}) ->
+	resp(Write);
+resp(#'Result'{read = Read, write = undefined}) ->
+	resp(Read);
+resp(#'ReadResult'{hasMore = More, rows = Rows}) ->
+	{More,resp(Rows)};
+resp(#'WriteResult'{lastChangeRowid = LC, rowsChanged = NChanged}) ->
+	{changes,LC,NChanged};
+resp(#'InvalidRequestException'{code = C, info = I}) ->
+	{error,{C,I}};
+resp(R) ->
+	R.
 
 
 -record(dp, {conn, hostinfo = [], otherhosts = [], callqueue, tryconn}).

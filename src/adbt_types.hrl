@@ -24,16 +24,14 @@
 
 %% struct 'ReadResult'
 
--record('ReadResult', {'success' :: boolean(),
-                       'hasMore' :: boolean(),
+-record('ReadResult', {'hasMore' :: boolean(),
                        'columns' = [] :: list(),
                        'rows' = [] :: list()}).
 -type 'ReadResult'() :: #'ReadResult'{}.
 
 %% struct 'WriteResult'
 
--record('WriteResult', {'error' :: string() | binary(),
-                        'lastChangeRowid' :: integer(),
+-record('WriteResult', {'lastChangeRowid' :: integer(),
                         'rowsChanged' :: integer()}).
 -type 'WriteResult'() :: #'WriteResult'{}.
 
