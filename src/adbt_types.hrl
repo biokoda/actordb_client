@@ -1,8 +1,6 @@
 -ifndef(_adbt_types_included).
 -define(_adbt_types_included, yeah).
 
--define(ADBT_NULL_ISNULL, 1).
-
 -define(ADBT_ERRORCODE_NOTLOGGEDIN, 1).
 -define(ADBT_ERRORCODE_EMPTYACTORNAME, 2).
 -define(ADBT_ERRORCODE_INVALIDACTORNAME, 3).
@@ -19,7 +17,7 @@
                 'real' :: float(),
                 'bval' :: boolean(),
                 'text' :: string() | binary(),
-                'isnull' :: integer()}).
+                'isnull' :: boolean()}).
 -type 'Val'() :: #'Val'{}.
 
 %% struct 'ReadResult'

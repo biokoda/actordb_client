@@ -105,7 +105,7 @@ resp(#'Val'{bval = V}) when V == true; V == false ->
 	V;
 resp(#'Val'{text = V}) when is_binary(V); is_list(V) ->
 	V;
-resp(#'Val'{isnull = 1}) ->
+resp(#'Val'{isnull = true}) ->
 	undefined;
 resp(#'Result'{read = undefined, write = Write}) ->
 	resp(Write);
