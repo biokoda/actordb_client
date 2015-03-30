@@ -79,8 +79,8 @@ struct_info_ext('LoginResult') ->
 ;
 
 struct_info_ext('Result') ->
-  {struct, [{1, undefined, {struct, {'adbt_types', 'ReadResult'}}, 'read', #'ReadResult'{}},
-          {2, undefined, {struct, {'adbt_types', 'WriteResult'}}, 'write', #'WriteResult'{}}]}
+  {struct, [{1, undefined, {struct, {'adbt_types', 'ReadResult'}}, 'rdRes', #'ReadResult'{}},
+          {2, undefined, {struct, {'adbt_types', 'WriteResult'}}, 'wrRes', #'WriteResult'{}}]}
 ;
 
 struct_info_ext('InvalidRequestException') ->

@@ -43,8 +43,8 @@
 
 %% struct 'Result'
 
--record('Result', {'read' :: 'ReadResult'(),
-                   'write' :: 'WriteResult'()}).
+-record('Result', {'rdRes' :: 'ReadResult'(),
+                   'wrRes' :: 'WriteResult'()}).
 -type 'Result'() :: #'Result'{}.
 
 %% struct 'InvalidRequestException'

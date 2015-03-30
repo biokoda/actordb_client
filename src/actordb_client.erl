@@ -5,10 +5,10 @@
 -compile([{parse_transform, lager_transform}]).
 -include("adbt_types.hrl").
 % API
--export([test/0, start/2, start/1, 
-	exec/4, exec/5, 
-	exec_multi/4,exec_multi/5, 
-	exec_all/3, exec_all/4, 
+-export([test/0, start/2, start/1,
+	exec/4, exec/5,
+	exec_multi/4,exec_multi/5,
+	exec_all/3, exec_all/4,
 	exec/1,exec/2]).
 -behaviour(gen_server).
 -behaviour(poolboy_worker).
@@ -28,7 +28,7 @@ test() ->
     ],
     % Multiple hosts in worker params. Every worker will pick one random host and connect to that.
     % If connection to DB is lost, it will try to find a working host.
-    % WorkerParams = 
+    % WorkerParams =
     % [
     %    [
     %      {hostname, "192.168.1.2"},
@@ -45,9 +45,9 @@ test() ->
     % ],
 	start(PoolInfo,WorkerParams).
 
-% Single pool is most likely sufficient for most situations. 
+% Single pool is most likely sufficient for most situations.
 % WorkerParams can be a single property list (connect to one host)
-% or a list of property lists (worker randomly connects to one of the hosts). 
+% or a list of property lists (worker randomly connects to one of the hosts).
 start(PoolParams,WorkerParams) ->
 	start([{default_pool,PoolParams,WorkerParams}]).
 start([{_Poolname,_PoolParams, _WorkerParams}|_] =  Pools) ->
@@ -107,9 +107,9 @@ resp(#'Val'{text = V}) when is_binary(V); is_list(V) ->
 	V;
 resp(#'Val'{isnull = true}) ->
 	undefined;
-resp(#'Result'{read = undefined, write = Write}) ->
+resp(#'Result'{rdRes = undefined, wrRes = Write}) ->
 	resp(Write);
-resp(#'Result'{read = Read, write = undefined}) ->
+resp(#'Result'{rdRes = Read, wrRes = undefined}) ->
 	resp(Read);
 resp(#'ReadResult'{hasMore = More, rows = Rows}) ->
 	{More,resp(Rows)};
@@ -224,7 +224,7 @@ do_connect(Props) ->
     Username = proplists:get_value(username, Props),
     Password = proplists:get_value(password, Props),
     Port = proplists:get_value(port, Props),
-    
+
     case catch thrift_client_util:new(Hostname, Port, adbt_thrift, []) of
     	{ok,C} ->
     		case catch thrift_client:call(C, login, [Username,Password]) of
