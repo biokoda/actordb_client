@@ -7,7 +7,8 @@
 -define(ADBT_ERRORCODE_INVALIDTYPE, 4).
 -define(ADBT_ERRORCODE_NOTPERMITTED, 5).
 -define(ADBT_ERRORCODE_SQLERROR, 6).
--define(ADBT_ERRORCODE_ERROR, 7).
+-define(ADBT_ERRORCODE_CONSENSUSTIMEOUT, 7).
+-define(ADBT_ERRORCODE_ERROR, 100).
 
 %% struct 'Val'
 
@@ -19,6 +20,16 @@
                 'text' :: string() | binary(),
                 'isnull' :: boolean()}).
 -type 'Val'() :: #'Val'{}.
+
+%% struct 'Prepare'
+
+-record('Prepare', {'int' :: integer(),
+                    'real' :: float(),
+                    'bin' :: string() | binary(),
+                    'text' :: string() | binary(),
+                    'rows' :: list(),
+                    'columns' :: list()}).
+-type 'Prepare'() :: #'Prepare'{}.
 
 %% struct 'ReadResult'
 

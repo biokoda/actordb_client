@@ -20,6 +20,15 @@ struct_info('Val') ->
           {7, bool}]}
 ;
 
+struct_info('Prepare') ->
+  {struct, [{1, i32},
+          {2, double},
+          {3, string},
+          {4, string},
+          {5, {list, {map, string, {struct, {'adbt_types', 'Val'}}}}},
+          {6, {list, string}}]}
+;
+
 struct_info('ReadResult') ->
   {struct, [{1, bool},
           {2, {list, string}},
@@ -60,6 +69,15 @@ struct_info_ext('Val') ->
           {7, undefined, bool, 'isnull', undefined}]}
 ;
 
+struct_info_ext('Prepare') ->
+  {struct, [{1, undefined, i32, 'int', undefined},
+          {2, undefined, double, 'real', undefined},
+          {3, undefined, string, 'bin', undefined},
+          {4, undefined, string, 'text', undefined},
+          {5, undefined, {list, {map, string, {struct, {'adbt_types', 'Val'}}}}, 'rows', []},
+          {6, undefined, {list, string}, 'columns', []}]}
+;
+
 struct_info_ext('ReadResult') ->
   {struct, [{1, required, bool, 'hasMore', undefined},
           {2, required, {list, string}, 'columns', []},
@@ -89,4 +107,3 @@ struct_info_ext('InvalidRequestException') ->
 ;
 
 struct_info_ext(_) -> erlang:error(function_clause).
-

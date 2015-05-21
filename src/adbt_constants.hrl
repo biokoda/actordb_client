@@ -7,5 +7,4 @@
 
 -include("adbt_types.hrl").
 
--define(ADBT_VERSION, "1.0.0").
-
+-define(ADBT_VERSION, "1.0.1").
