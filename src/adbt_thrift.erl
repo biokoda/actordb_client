@@ -51,7 +51,7 @@ function_info('exec_single_prepare', params_type) ->
           {2, string},
           {3, string},
           {4, {list, string}},
-          {5, {list, {struct, {'adbt_types', 'Prepare'}}}}]}
+          {5, {list, {list, {struct, {'adbt_types', 'Val'}}}}}]}
 ;
 function_info('exec_single_prepare', reply_type) ->
   {struct, {'adbt_types', 'Result'}};
@@ -76,7 +76,7 @@ function_info('exec_multi_prepare', params_type) ->
           {2, string},
           {3, string},
           {4, {list, string}},
-          {5, {list, {struct, {'adbt_types', 'Prepare'}}}}]}
+          {5, {list, {list, {struct, {'adbt_types', 'Val'}}}}}]}
 ;
 function_info('exec_multi_prepare', reply_type) ->
   {struct, {'adbt_types', 'Result'}};
@@ -99,7 +99,7 @@ function_info('exec_all_prepare', params_type) ->
   {struct, [{1, string},
           {2, string},
           {3, {list, string}},
-          {4, {list, {struct, {'adbt_types', 'Prepare'}}}}]}
+          {4, {list, {list, {struct, {'adbt_types', 'Val'}}}}}]}
 ;
 function_info('exec_all_prepare', reply_type) ->
   {struct, {'adbt_types', 'Result'}};
@@ -118,7 +118,7 @@ function_info('exec_sql', exceptions) ->
 % exec_sql_prepare(This, Sql, Bindingvals)
 function_info('exec_sql_prepare', params_type) ->
   {struct, [{1, string},
-          {2, {list, {struct, {'adbt_types', 'Prepare'}}}}]}
+          {2, {list, {list, {struct, {'adbt_types', 'Val'}}}}}]}
 ;
 function_info('exec_sql_prepare', reply_type) ->
   {struct, {'adbt_types', 'Result'}};
@@ -126,3 +126,4 @@ function_info('exec_sql_prepare', exceptions) ->
   {struct, [{1, {struct, {'adbt_types', 'InvalidRequestException'}}}]}
 ;
 function_info(_Func, _Info) -> erlang:error(function_clause).
+
