@@ -6,6 +6,7 @@
 -include("adbt_types.hrl").
 % API
 -export([test/0, start/2, start/1,
+exec_config/1,exec_config/2,
 exec_single/4, exec_single/5,
 exec_single_prepare/5, exec_single_prepare/6,
 exec_multi/4,exec_multi/5,
@@ -58,6 +59,13 @@ start([{_Poolname,_PoolParams, _WorkerParams}|_] =  Pools) ->
 	ok = application:set_env(actordb_client, pools,Pools),
 	application:start(?MODULE).
 
+exec_config(Sql) ->
+	exec_config(default_pool,Sql).
+exec_config(PoolName, Sql) ->
+	R = poolboy:transaction(PoolName, fun(Worker) ->
+		gen_server:call(Worker, {call, exec_config, [Sql]})
+	end),
+	resp(R).
 
 exec_single(Actor,Type,Sql,Flags) ->
 	exec_single(default_pool,Actor,Type,Sql,Flags).
