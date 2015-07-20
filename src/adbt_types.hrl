@@ -21,19 +21,6 @@
                 'isnull' :: boolean()}).
 -type 'Val'() :: #'Val'{}.
 
-%% struct 'Server'
-
--record('Server', {'servers' = [] :: list(),
-                   'groups' = [] :: list()}).
--type 'Server'() :: #'Server'{}.
-
-%% struct 'Group'
-
--record('Group', {'name' :: string() | binary(),
-                  'nodes' = [] :: list(),
-                  'type' :: string() | binary()}).
--type 'Group'() :: #'Group'{}.
-
 %% struct 'ReadResult'
 
 -record('ReadResult', {'hasMore' :: boolean(),

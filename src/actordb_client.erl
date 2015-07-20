@@ -6,19 +6,18 @@
 -include("adbt_types.hrl").
 % API
 -export([test/0, start/2, start/1,
-  exec_single/4, exec_single/5,
-	exec_single_prepare/5, exec_single_prepare/6,
-	exec_multi/4,exec_multi/5,
-	exec_multi_prepare/5,exec_multi_prepare/6,
-	exec_all_prepare/4,exec_all_prepare/5,
-	exec_prepare/2,exec_prepare/3,
-	exec_all/3, exec_all/4,
-	exec/1,exec/2]).
+exec_single/4, exec_single/5,
+exec_single_prepare/5, exec_single_prepare/6,
+exec_multi/4,exec_multi/5,
+exec_multi_prepare/5,exec_multi_prepare/6,
+exec_all_prepare/4,exec_all_prepare/5,
+exec_prepare/2,exec_prepare/3,
+exec_all/3, exec_all/4,
+exec/1,exec/2]).
 -behaviour(gen_server).
 -behaviour(poolboy_worker).
 -export([start_link/1]).
--export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
-		 code_change/3]).
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,code_change/3]).
 -export([resp/1]).
 
 % Usage example
