@@ -20,6 +20,17 @@ struct_info('Val') ->
           {7, bool}]}
 ;
 
+struct_info('Server') ->
+  {struct, [{1, {list, string}},
+          {2, {list, {struct, {'adbt_types', 'Group'}}}}]}
+;
+
+struct_info('Group') ->
+  {struct, [{1, string},
+          {2, {list, string}},
+          {3, string}]}
+;
+
 struct_info('ReadResult') ->
   {struct, [{1, bool},
           {2, {list, string}},
@@ -60,6 +71,17 @@ struct_info_ext('Val') ->
           {7, undefined, bool, 'isnull', undefined}]}
 ;
 
+struct_info_ext('Server') ->
+  {struct, [{1, required, {list, string}, 'servers', []},
+          {2, required, {list, {struct, {'adbt_types', 'Group'}}}, 'groups', []}]}
+;
+
+struct_info_ext('Group') ->
+  {struct, [{1, required, string, 'name', undefined},
+          {2, required, {list, string}, 'nodes', []},
+          {3, required, string, 'type', undefined}]}
+;
+
 struct_info_ext('ReadResult') ->
   {struct, [{1, required, bool, 'hasMore', undefined},
           {2, required, {list, string}, 'columns', []},
@@ -89,4 +111,3 @@ struct_info_ext('InvalidRequestException') ->
 ;
 
 struct_info_ext(_) -> erlang:error(function_clause).
-

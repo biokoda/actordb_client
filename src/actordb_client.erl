@@ -18,7 +18,7 @@
 -behaviour(poolboy_worker).
 -export([start_link/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
-         code_change/3]).
+		 code_change/3]).
 -export([resp/1]).
 
 % Usage example
@@ -26,28 +26,28 @@ test() ->
 	PoolInfo = [{size, 10}, {max_overflow, 5}],
 	% Single host in worker params. Every worker in pool will connect to it.
 	WorkerParams = [{hostname, "127.0.0.1"},
-        % {database, "db1"},
-        {username, "db1"},
-        {password, "abc123"},
-        {port,33306}
-    ],
-    % Multiple hosts in worker params. Every worker will pick one random host and connect to that.
-    % If connection to DB is lost, it will try to find a working host.
-    % WorkerParams =
-    % [
-    %    [
-    %      {hostname, "192.168.1.2"},
-    %      {username, "db1"},
-    %      {password, "abc123"},
-    %      {port,33306}
-    %    ],
-    %    [
-    %      {hostname, "192.168.1.3"},
-    %      {username, "db1"},
-    %      {password, "abc123"},
-    %      {port,33306}
-    %    ]
-    % ],
+		% {database, "db1"},
+		{username, "db1"},
+		{password, "abc123"},
+		{port,33306}
+	],
+	% Multiple hosts in worker params. Every worker will pick one random host and connect to that.
+	% If connection to DB is lost, it will try to find a working host.
+	% WorkerParams =
+	% [
+	%    [
+	%      {hostname, "192.168.1.2"},
+	%      {username, "db1"},
+	%      {password, "abc123"},
+	%      {port,33306}
+	%    ],
+	%    [
+	%      {hostname, "192.168.1.3"},
+	%      {username, "db1"},
+	%      {password, "abc123"},
+	%      {port,33306}
+	%    ]
+	% ],
 	start(PoolInfo,WorkerParams).
 
 % Single pool is most likely sufficient for most situations.
@@ -64,65 +64,65 @@ exec_single(Actor,Type,Sql,Flags) ->
 	exec_single(default_pool,Actor,Type,Sql,Flags).
 exec_single(PoolName,Actor,Type,Sql,Flags) ->
 	R = poolboy:transaction(PoolName, fun(Worker) ->
-        gen_server:call(Worker, {call, exec_single, [Actor,Type,Sql,Flags]})
-    end),
-    resp(R).
+		gen_server:call(Worker, {call, exec_single, [Actor,Type,Sql,Flags]})
+	end),
+	resp(R).
 
 exec_single_prepare(Actor,Type,Sql,Flags,BindingVals) ->
 	exec_single_prepare(default_pool,Actor,Type,Sql,Flags,BindingVals).
 exec_single_prepare(PoolName,Actor,Type,Sql,Flags,BindingVals) ->
 	R = poolboy:transaction(PoolName, fun(Worker) ->
-        gen_server:call(Worker, {call, exec_single_prepare, [Actor,Type,Sql,Flags,BindingVals]})
-    end),
-    resp(R).
+		gen_server:call(Worker, {call, exec_single_prepare, [Actor,Type,Sql,Flags,BindingVals]})
+	end),
+	resp(R).
 
 exec_multi(Actors, Type, Sql,Flags) ->
 	exec_multi(default_pool,Actors,Type,Sql,Flags).
 exec_multi(PoolName,[_|_] = Actors, Type, Sql, Flags) ->
 	R = poolboy:transaction(PoolName, fun(Worker) ->
-        gen_server:call(Worker, {call, exec_multi, [Actors,Type,Sql,Flags]})
-    end),
-    resp(R).
+		gen_server:call(Worker, {call, exec_multi, [Actors,Type,Sql,Flags]})
+	end),
+	resp(R).
 
 exec_multi_prepare(Actors, Type, Sql,Flags,BindingVals) ->
 	exec_multi_prepare(default_pool,Actors,Type,Sql,Flags,BindingVals).
 exec_multi_prepare(PoolName,[_|_] = Actors, Type, Sql, Flags,BindingVals) ->
 	R = poolboy:transaction(PoolName, fun(Worker) ->
-        gen_server:call(Worker, {call, exec_multi_prepare, [Actors,Type,Sql,Flags,BindingVals]})
-    end),
-    resp(R).
+		gen_server:call(Worker, {call, exec_multi_prepare, [Actors,Type,Sql,Flags,BindingVals]})
+	end),
+	resp(R).
 
 exec_all(Type,Sql,Flags) ->
 	exec_all(default_pool,Type,Sql,Flags).
 exec_all(PoolName,Type,Sql,Flags) ->
 	R = poolboy:transaction(PoolName, fun(Worker) ->
-        gen_server:call(Worker, {call, exec_all, [Type,Sql,Flags]})
-    end),
-    resp(R).
+		gen_server:call(Worker, {call, exec_all, [Type,Sql,Flags]})
+	end),
+	resp(R).
 
 exec_all_prepare(Type,Sql,Flags,BindingVals) ->
 	exec_all_prepare(default_pool,Type,Sql,Flags,BindingVals).
 exec_all_prepare(PoolName,Type,Sql,Flags,BindingVals) ->
 	R = poolboy:transaction(PoolName, fun(Worker) ->
-        gen_server:call(Worker, {call, exec_all_prepare, [Type,Sql,Flags,BindingVals]})
-    end),
-    resp(R).
+		gen_server:call(Worker, {call, exec_all_prepare, [Type,Sql,Flags,BindingVals]})
+	end),
+	resp(R).
 
 exec(Sql) ->
 	exec(default_pool,Sql).
 exec(PoolName,Sql) ->
 	R = poolboy:transaction(PoolName, fun(Worker) ->
-        gen_server:call(Worker, {call, exec_sql, [Sql]})
-    end),
-    resp(R).
+		gen_server:call(Worker, {call, exec_sql, [Sql]})
+	end),
+	resp(R).
 
 exec_prepare(Sql,BindingVals) ->
 	exec_prepare(default_pool,Sql,BindingVals).
 exec_prepare(PoolName,Sql,BindingVals) ->
 	R = poolboy:transaction(PoolName, fun(Worker) ->
-        gen_server:call(Worker, {call, exec_sql_prepare, [Sql,BindingVals]})
-    end),
-    resp(R).
+		gen_server:call(Worker, {call, exec_sql_prepare, [Sql,BindingVals]})
+	end),
+	resp(R).
 
 resp({ok,R}) ->
 	{ok,resp(R)};
@@ -161,19 +161,19 @@ resp(R) ->
 -record(dp, {conn, hostinfo = [], otherhosts = [], callqueue, tryconn}).
 
 start_link(Args) ->
-    gen_server:start_link(?MODULE, Args, []).
+	gen_server:start_link(?MODULE, Args, []).
 
 init(Args) ->
-    % process_flag(trap_exit, true),
-    random:seed(now()),
-    case Args of
-    	[{_,_}|_] = Props ->
-    		ok;
-    	[[{_,_}|_]|_] ->
-    		Props = randelem(Args)
-    end,
-    {ok,C1} = do_connect(Props),
-    {ok, #dp{conn=C1, hostinfo = Props, otherhosts = Args -- [Props], callqueue = queue:new()}}.
+	% process_flag(trap_exit, true),
+	random:seed(os:timestamp()),
+	case Args of
+		[{_,_}|_] = Props ->
+			ok;
+		[[{_,_}|_]|_] ->
+			Props = randelem(Args)
+	end,
+	{ok,C1} = do_connect(Props),
+	{ok, #dp{conn=C1, hostinfo = Props, otherhosts = Args -- [Props], callqueue = queue:new()}}.
 
 handle_call(_Msg, _From, #dp{conn = undefined} = P) ->
 	% We might delay response a bit for max 1s to see if we can reconnect?
@@ -202,7 +202,7 @@ handle_call({call, Func,Params}, _From, P) ->
 	end.
 
 handle_cast(_Msg, State) ->
-    {noreply, State}.
+	{noreply, State}.
 
 handle_info(reconnect,#dp{conn = undefined} = P) ->
 	{ok,C} = do_connect(P#dp.hostinfo),
@@ -240,10 +240,10 @@ handle_info({'DOWN',_Monitor,_,Pid,Reason}, #dp{tryconn = Pid} = P) ->
 
 terminate(_Reason, P) ->
 	(catch thrift_client:close(P#dp.conn)),
-    ok.
+	ok.
 
 code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
+	{ok, State}.
 
 
 tryconn(Props) ->
@@ -257,28 +257,28 @@ tryconn(Props) ->
 % If some other error (like invalid login info) throw exception
 do_connect(Props) ->
 	Hostname = proplists:get_value(hostname, Props),
-    % Database = proplists:get_value(database, Args),
-    Username = proplists:get_value(username, Props),
-    Password = proplists:get_value(password, Props),
-    Port = proplists:get_value(port, Props),
+	% Database = proplists:get_value(database, Args),
+	Username = proplists:get_value(username, Props),
+	Password = proplists:get_value(password, Props),
+	Port = proplists:get_value(port, Props),
 
-    case catch thrift_client_util:new(Hostname, Port, adbt_thrift, []) of
-    	{ok,C} ->
-    		case catch thrift_client:call(C, login, [Username,Password]) of
-    			{C1,{ok,_}} ->
-    				{ok,C1};
-    			{_,{error,Err}} when Err == closed; Err == econnrefused ->
-    				self() ! connect_other,
-    				{ok,undefined};
-    			{_,{exception,Msg}} ->
-    				throw(Msg);
-    			{_,Err} ->
-    				throw(Err)
-    		end;
-    	{_,{error,Err}} when Err == closed; Err == econnrefused ->
-    		self() ! connect_other,
-    		{ok,undefined}
-    end.
+	case catch thrift_client_util:new(Hostname, Port, adbt_thrift, []) of
+		{ok,C} ->
+			case catch thrift_client:call(C, login, [Username,Password]) of
+				{C1,{ok,_}} ->
+					{ok,C1};
+				{_,{error,Err}} when Err == closed; Err == econnrefused ->
+					self() ! connect_other,
+					{ok,undefined};
+				{_,{exception,Msg}} ->
+					throw(Msg);
+				{_,Err} ->
+					throw(Err)
+			end;
+		{_,{error,Err}} when Err == closed; Err == econnrefused ->
+			self() ! connect_other,
+			{ok,undefined}
+	end.
 
 randelem(Args) ->
 	case lists:keyfind(crypto,1,application:which_applications()) of
@@ -287,4 +287,4 @@ randelem(Args) ->
 		_ ->
 			Num = binary:first(crypto:rand_bytes(1))
 	end,
-    lists:nth((Num rem length(Args)) + 1,Args).
+	lists:nth((Num rem length(Args)) + 1,Args).

@@ -33,6 +33,15 @@ function_info('login', reply_type) ->
 function_info('login', exceptions) ->
   {struct, [{1, {struct, {'adbt_types', 'InvalidRequestException'}}}]}
 ;
+% initialize(This, Servers)
+function_info('initialize', params_type) ->
+  {struct, [{1, {struct, {'adbt_types', 'Server'}}}]}
+;
+function_info('initialize', reply_type) ->
+  string;
+function_info('initialize', exceptions) ->
+  {struct, [{1, {struct, {'adbt_types', 'InvalidRequestException'}}}]}
+;
 % exec_single(This, Actorname, Actortype, Sql, Flags)
 function_info('exec_single', params_type) ->
   {struct, [{1, string},
@@ -126,4 +135,3 @@ function_info('exec_sql_prepare', exceptions) ->
   {struct, [{1, {struct, {'adbt_types', 'InvalidRequestException'}}}]}
 ;
 function_info(_Func, _Info) -> erlang:error(function_clause).
-
