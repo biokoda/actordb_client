@@ -5,7 +5,7 @@
 -compile([{parse_transform, lager_transform}]).
 -include("adbt_types.hrl").
 % API
--export([test/0, start/2, start/1,
+-export([test/0,test/2, start/2, start/1,
 exec_config/1,exec_config/2,
 exec_single/4, exec_single/5,
 exec_single_prepare/5, exec_single_prepare/6,
@@ -23,12 +23,14 @@ exec/1,exec/2]).
 
 % Usage example
 test() ->
+	test("db1","abc123").
+test(U,Pw) ->
 	PoolInfo = [{size, 10}, {max_overflow, 5}],
 	% Single host in worker params. Every worker in pool will connect to it.
 	WorkerParams = [{hostname, "127.0.0.1"},
 		% {database, "db1"},
-		{username, "db1"},
-		{password, "abc123"},
+		{username, U},
+		{password, Pw},
 		{port,33306}
 	],
 	% Multiple hosts in worker params. Every worker will pick one random host and connect to that.
