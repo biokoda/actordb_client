@@ -6,6 +6,7 @@
 % API
 -export([test/0,test/2, start/2, start/1,
 exec_config/1,exec_config/2,
+exec_schema/1,exec_schema/2,
 exec_single/4, exec_single/5,
 exec_single_prepare/5, exec_single_prepare/6,
 exec_multi/4,exec_multi/5,
@@ -65,6 +66,14 @@ exec_config(Sql) ->
 exec_config(PoolName, Sql) ->
 	R = poolboy:transaction(PoolName, fun(Worker) ->
 		gen_server:call(Worker, {call, exec_config, [Sql]})
+	end),
+	resp(R).
+
+exec_schema(Sql) ->
+	exec_schema(default_pool,Sql).
+exec_schema(PoolName, Sql) ->
+	R = poolboy:transaction(PoolName, fun(Worker) ->
+		gen_server:call(Worker, {call, exec_schema, [Sql]})
 	end),
 	resp(R).
 
