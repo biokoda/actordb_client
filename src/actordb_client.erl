@@ -2,7 +2,6 @@
 % License, v. 2.0. If a copy of the MPL was not distributed with this
 % file, You can obtain one at http://mozilla.org/MPL/2.0/.
 -module(actordb_client).
--compile([{parse_transform, lager_transform}]).
 -include("adbt_types.hrl").
 % API
 -export([test/0,test/2, start/2, start/1,
@@ -181,8 +180,14 @@ init(Args) ->
 		[[{_,_}|_]|_] ->
 			Props = randelem(Args)
 	end,
-	{ok,C1} = do_connect(Props),
-	{ok, #dp{conn=C1, hostinfo = Props, otherhosts = Args -- [Props], callqueue = queue:new()}}.
+	case catch do_connect(Props) of
+		{ok,C1} ->
+			{ok, #dp{conn=C1, hostinfo = Props, otherhosts = Args -- [Props], callqueue = queue:new()}};
+		{'InvalidRequestException',_,<<"Username and/or password incorrect.">>} = Err ->
+			{stop,Err};
+		{error,E} ->
+			{stop,{error,E}}
+	end.
 
 handle_call(_Msg, _From, #dp{conn = undefined} = P) ->
 	% We might delay response a bit for max 1s to see if we can reconnect?
