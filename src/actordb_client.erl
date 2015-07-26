@@ -2,7 +2,8 @@
 % License, v. 2.0. If a copy of the MPL was not distributed with this
 % file, You can obtain one at http://mozilla.org/MPL/2.0/.
 -module(actordb_client).
--include("adbt_types.hrl").
+-include_lib("adbt/src/adbt_types.hrl").
+-include_lib("adbt/src/adbt_constants.hrl").
 % API
 -export([test/0,test/2, start/2, start/1,
 exec_config/1,exec_config/2,
