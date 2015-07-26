@@ -5,7 +5,8 @@
   {registered, []},
   {applications, [
                   kernel,
-                  stdlib
+                  stdlib,
+                  adbt
                  ]},
   {mod, { actordb_client_app, []}},
   {env, []}
