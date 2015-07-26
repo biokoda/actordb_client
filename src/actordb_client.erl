@@ -286,7 +286,7 @@ do_connect(Props) ->
 	Password = proplists:get_value(password, Props),
 	Port = proplists:get_value(port, Props),
 
-	case catch thrift_client_util:new(Hostname, Port, adbt_thrift, []) of
+	case catch thrift_client_util:new(Hostname, Port, actordb_thrift, []) of
 		{ok,C} ->
 			case catch thrift_client:call(C, login, [Username,Password]) of
 				{C1,{ok,_}} ->
