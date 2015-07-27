@@ -60,7 +60,8 @@ start(PoolParams,WorkerParams) ->
 	start([{default_pool,PoolParams,WorkerParams}]).
 start([{_Poolname,_PoolParams, _WorkerParams}|_] =  Pools) ->
 	ok = application:set_env(actordb_client, pools,Pools),
-	application:ensure_all_started(?MODULE).
+	{ok,_} = application:ensure_all_started(?MODULE),
+	ok.
 
 exec_config(Sql) ->
 	exec_config(default_pool,Sql).
