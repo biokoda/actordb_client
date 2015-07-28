@@ -60,8 +60,23 @@ start(PoolParams,WorkerParams) ->
 	start([{default_pool,PoolParams,WorkerParams}]).
 start([{_Poolname,_PoolParams, _WorkerParams}|_] =  Pools) ->
 	ok = application:set_env(actordb_client, pools,Pools),
-	{ok,_} = application:ensure_all_started(?MODULE),
-	ok.
+	case application:ensure_all_started(?MODULE) of
+		{ok,_} ->
+			% Check in every pool if connection succeeded.
+			% If any ok, return ok (workers try other connections if their set one fails)
+			R = [poolboy:transaction(PoolName, fun(Worker) ->
+				gen_server:call(Worker, status) end) || {PoolName,_,_} <- Pools],
+			case [ok || ok <- R] of
+				[ok|_] ->
+					ok;
+				[] ->
+					[poolboy:stop(PoolName) || {PoolName,_,_} <- Pools],
+					application:stop(?MODULE),
+					hd(R)
+			end;
+		Err ->
+			Err
+	end.
 
 exec_config(Sql) ->
 	exec_config(default_pool,Sql).
@@ -177,7 +192,7 @@ resp(R) ->
 	R.
 
 
--record(dp, {conn, hostinfo = [], otherhosts = [], callqueue, tryconn}).
+-record(dp, {conn, hostinfo = [], otherhosts = [], callqueue = queue:new(), tryconn}).
 
 start_link(Args) ->
 	gen_server:start_link(?MODULE, Args, []).
@@ -191,18 +206,27 @@ init(Args) ->
 		[[{_,_}|_]|_] ->
 			Props = randelem(Args)
 	end,
+	Other = Args -- [Props],
 	case catch do_connect(Props) of
 		{ok,C1} ->
-			{ok, #dp{conn=C1, hostinfo = Props, otherhosts = Args -- [Props], callqueue = queue:new()}};
-		{'InvalidRequestException',_,<<"Username and/or password incorrect.">>} = Err ->
-			{stop,Err};
+			{ok, #dp{conn=C1, hostinfo = Props, otherhosts = Other}};
+		{error,closed} when Other /= [] ->
+			self() ! connect_other,
+			{ok, #dp{conn={error,closed}, hostinfo = Props, otherhosts = Other}};
 		{error,E} ->
-			{stop,{error,E}}
+			erlang:send_after(500,self(),reconnect),
+			{ok, #dp{conn={error,E}, hostinfo = Props, otherhosts = Other}}
+		% {'InvalidRequestException',_,<<"Username and/or password incorrect.">>} = Err ->
+		% 	{stop,Err};
+		% {error,E} ->
+		% 	{stop,{error,E}}
 	end.
 
-handle_call(_Msg, _From, #dp{conn = undefined} = P) ->
+handle_call(stop,_,P) ->
+	{stop,normal,P};
+handle_call(_Msg, _From, #dp{conn = {error,E}} = P) ->
 	% We might delay response a bit for max 1s to see if we can reconnect?
-	{reply,{error,closed},P};
+	{reply,error1({error,E}),P};
 	% {noreply,P#dp{callqueue = queue:in_r({From,Msg},P#dp.callqueue)}};
 handle_call({call, Func,Params}, _From, P) ->
 	Result = (catch thrift_client:call(P#dp.conn, Func, Params)),
@@ -215,45 +239,60 @@ handle_call({call, Func,Params}, _From, P) ->
 			(catch thrift_client:close(P#dp.conn)),
 			self() ! reconnect,
 			% lager:error("Connection lost to ~p",[proplists:get_value(hostname, P#dp.hostinfo)]),
-			{reply,{error,Msg},P#dp{conn = undefined}};
-		{_, {E, Msg}} when E == error ->
+			{reply,error1({error,Msg}),P#dp{conn = {error,closed}}};
+		{_, {error, Msg}} ->
 			(catch thrift_client:close(P#dp.conn)),
 			self() ! reconnect,
-			{reply,{E, Msg}, P#dp{conn = undefined}};
-		Other ->
+			{reply,error1({error, Msg}), P#dp{conn = {error,Msg}}};
+		{error,E} ->
 			(catch thrift_client:close(P#dp.conn)),
 			self() ! reconnect,
-			{reply, Other, P#dp{conn = undefined}}
+			{reply, error1({error,E}), P#dp{conn = {error,E}}}
+	end;
+handle_call(status,_,P) ->
+	case P#dp.conn of
+		{error,_} ->
+			{reply,P#dp.conn,P};
+		_ ->
+			{reply,ok,P}
 	end.
 
 handle_cast(_Msg, State) ->
 	{noreply, State}.
 
-handle_info(reconnect,#dp{conn = undefined} = P) ->
-	{ok,C} = do_connect(P#dp.hostinfo),
-	{noreply,P#dp{conn = C}};
+handle_info(reconnect,#dp{conn = {error,_}} = P) ->
+	case do_connect(P#dp.hostinfo) of
+		{ok,C} ->
+			{noreply,P#dp{conn = C}};
+		{error,closed} ->
+			self() ! connect_other,
+			{noreply,P#dp{conn = {error,closed}}};
+		{error,E} ->
+			{noreply,P#dp{conn = {error,E}}}
+	end;
 handle_info(reconnect,P) ->
 	(catch thrift_client:close(P#dp.conn)),
-	handle_info(reconnect,P#dp{conn = undefined});
+	handle_info(reconnect,P#dp{conn = {error,error}});
 handle_info(connect_other,#dp{otherhosts = []} = P) ->
 	erlang:send_after(500,self(),reconnect),
 	{noreply,P};
-handle_info(connect_other, #dp{conn = undefined} = P) ->
+handle_info(connect_other, #dp{conn = {error,_}} = P) ->
 	Props = randelem(P#dp.otherhosts),
 	case do_connect(Props) of
-		{ok,undefined} ->
+		{error,E} ->
 			% Cant connect to other host. Wait a bit and
 			% start again with our assigned host.
 			erlang:send_after(500,self(),reconnect),
-			{noreply,P};
+			{noreply,P#dp{conn = {error,E}}};
 		{ok,C} ->
 			% We found a new connection to some other host.
 			% Still periodically try to reconnect to original host if it comes back up.
 			{noreply,P#dp{conn = C, tryconn = tryconn(P#dp.hostinfo)}}
 	end;
 handle_info(connect_other,P) ->
-	(catch thrift_client:close(P#dp.conn)),
-	handle_info(connect_other,P#dp{conn = undefined});
+	{noreply,P};
+	% (catch thrift_client:close(P#dp.conn)),
+	% handle_info(connect_other,P#dp{conn = {error,error}});
 handle_info({'DOWN',_Monitor,_,Pid,Reason}, #dp{tryconn = Pid} = P) ->
 	case Reason of
 		{ok,C} when C /= undefined ->
@@ -293,16 +332,14 @@ do_connect(Props) ->
 				{C1,{ok,_}} ->
 					{ok,C1};
 				{_,{error,Err}} when Err == closed; Err == econnrefused ->
-					self() ! connect_other,
-					{ok,undefined};
+					{error,closed};
 				{_,{exception,Msg}} ->
-					throw(Msg);
+					{error,Msg};
 				{_,Err} ->
-					throw(Err)
+					{error,Err}
 			end;
 		{_,{error,Err}} when Err == closed; Err == econnrefused ->
-			self() ! connect_other,
-			{ok,undefined}
+			{error,closed}
 	end.
 
 randelem(Args) ->
@@ -313,3 +350,33 @@ randelem(Args) ->
 			Num = binary:first(crypto:rand_bytes(1))
 	end,
 	lists:nth((Num rem length(Args)) + 1,Args).
+
+error1(E) ->
+	case E of
+		{error,X} ->
+			error1(X);
+		{'InvalidRequestException',?ADBT_ERRORCODE_LOGINFAILED, Msg} ->
+			{error,{login_failed,Msg}};
+		{'InvalidRequestException',?ADBT_ERRORCODE_MISSINGNODESINSERT, Msg} ->
+			{error,{missing_nodes,Msg}};
+		{'InvalidRequestException',?ADBT_ERRORCODE_MISSINGGROUPINSERT, Msg} ->
+			{error,{missing_group,Msg}};
+		{'InvalidRequestException',?ADBT_ERRORCODE_LOCALNODEMISSING, Msg} ->
+			{error,{missing_local_node,Msg}};
+		{'InvalidRequestException',?ADBT_ERRORCODE_CONSENSUSTIMEOUT, Msg} ->
+			{error,{consensus_timeout,Msg}};
+		{'InvalidRequestException',?ADBT_ERRORCODE_SQLERROR, Msg} ->
+			{error,{sql_error,Msg}};
+		{'InvalidRequestException',?ADBT_ERRORCODE_NOTPERMITTED, Msg} ->
+			{error,{permission,Msg}};
+		{'InvalidRequestException',?ADBT_ERRORCODE_INVALIDTYPE, Msg} ->
+			{error,{invalid_type,Msg}};
+		{'InvalidRequestException',?ADBT_ERRORCODE_INVALIDACTORNAME, Msg} ->
+			{error,{invalid_actor_name,Msg}};
+		{'InvalidRequestException',?ADBT_ERRORCODE_EMPTYACTORNAME, Msg} ->
+			{error,{empty_actor_name,Msg}};
+		{'InvalidRequestException',?ADBT_ERRORCODE_NOTLOGGEDIN, Msg} ->
+			{error,{not_logged_in,Msg}};
+		_ ->
+			{error,E}
+	end.
