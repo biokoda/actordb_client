@@ -338,6 +338,8 @@ do_connect(Props) ->
 				{_,Err} ->
 					{error,Err}
 			end;
+		{error,econnrefused} ->
+			{error,closed};
 		{_,{error,Err}} when Err == closed; Err == econnrefused ->
 			{error,closed}
 	end.
