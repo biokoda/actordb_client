@@ -202,11 +202,11 @@ init(Args) ->
 	random:seed(os:timestamp()),
 	case Args of
 		[{_,_}|_] = Props ->
-			ok;
+			Other = [];
 		[[{_,_}|_]|_] ->
-			Props = randelem(Args)
+			Props = randelem(Args),
+			Other = Args -- [Props]
 	end,
-	Other = Args -- [Props],
 	case catch do_connect(Props) of
 		{ok,C1} ->
 			{ok, #dp{conn=C1, hostinfo = Props, otherhosts = Other}};
