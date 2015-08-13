@@ -15,7 +15,7 @@ exec_multi_prepare/5,exec_multi_prepare/6,
 exec_all_prepare/4,exec_all_prepare/5,
 exec_prepare/2,exec_prepare/3,
 exec_all/3, exec_all/4,
-exec/1,exec/2]).
+exec/1,exec/2,salt/0,salt/1]).
 -behaviour(gen_server).
 -behaviour(poolboy_worker).
 -export([start_link/1]).
@@ -83,6 +83,14 @@ exec_config(Sql) ->
 exec_config(PoolName, Sql) ->
 	R = poolboy:transaction(PoolName, fun(Worker) ->
 		gen_server:call(Worker, {call, exec_config, [Sql]})
+	end),
+	resp(R).
+
+salt() ->
+	salt(default_pool).
+salt(PoolName) ->
+	R = poolboy:transaction(PoolName, fun(Worker) ->
+		gen_server:call(Worker, {call, salt, []})
 	end),
 	resp(R).
 
@@ -328,18 +336,23 @@ do_connect(Props) ->
 
 	case catch thrift_client_util:new(Hostname, Port, actordb_thrift, []) of
 		{ok,C} ->
-			case catch thrift_client:call(C, login, [Username,Password]) of
-				{C1,{ok,_}} ->
-					{ok,C1};
+			case (catch thrift_client:call(C, salt, [])) of
+				{CS,{ok,Salt}} ->
+					<<Num1:160>> = HashBin = crypto:hash(sha, Password),
+					<<Num2:160>> = crypto:hash(sha, <<Salt/binary, (crypto:hash(sha, HashBin))/binary>>),
+					case catch thrift_client:call(CS, login, [Username,<<(Num1 bxor Num2):160>>]) of
+						{C1,{ok,_}} ->
+							{ok,C1};
+						{_,{error,Err}} when Err == closed; Err == econnrefused ->
+							{error,closed};
+						{_,{exception,Msg}} ->
+							{error,Msg};
+						{_,Err} ->
+							{error,Err}
+					end;
 				{_,{error,Err}} when Err == closed; Err == econnrefused ->
-					{error,closed};
-				{_,{exception,Msg}} ->
-					{error,Msg};
-				{_,Err} ->
-					{error,Err}
+					{error,closed}
 			end;
-		{error,econnrefused} ->
-			{error,closed};
 		{_,{error,Err}} when Err == closed; Err == econnrefused ->
 			{error,closed}
 	end.
