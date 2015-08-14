@@ -9,11 +9,11 @@
 exec_config/1,exec_config/2,
 exec_schema/1,exec_schema/2,
 exec_single/4, exec_single/5,
-exec_single_prepare/5, exec_single_prepare/6,
+exec_single_param/5, exec_single_param/6,
 exec_multi/4,exec_multi/5,
-exec_multi_prepare/5,exec_multi_prepare/6,
-exec_all_prepare/4,exec_all_prepare/5,
-exec_prepare/2,exec_prepare/3,
+% exec_multi_prepare/5,exec_multi_prepare/6,
+% exec_all_prepare/4,exec_all_prepare/5,
+exec_param/2,exec_param/3,
 exec_all/3, exec_all/4,
 exec/1,exec/2,salt/0,salt/1]).
 -behaviour(gen_server).
@@ -106,15 +106,16 @@ exec_single(Actor,Type,Sql,Flags) ->
 	exec_single(default_pool,Actor,Type,Sql,Flags).
 exec_single(PoolName,Actor,Type,Sql,Flags) ->
 	R = poolboy:transaction(PoolName, fun(Worker) ->
-		gen_server:call(Worker, {call, exec_single, [Actor,Type,Sql,Flags]})
+		gen_server:call(Worker, {call, exec_single, [Actor,tostr(Type),Sql,flags(Flags)]})
 	end),
 	resp(R).
 
-exec_single_prepare(Actor,Type,Sql,Flags,BindingVals) ->
-	exec_single_prepare(default_pool,Actor,Type,Sql,Flags,BindingVals).
-exec_single_prepare(PoolName,Actor,Type,Sql,Flags,BindingVals) ->
+% Example: actordb_client:exec_single_param("myactor","type1","insert into tab values (?1,?2,?3);",[create],[[20000000,"bigint!",3]]).
+exec_single_param(Actor,Type,Sql,Flags,BindingVals) ->
+	exec_single_param(default_pool,Actor,Type,Sql,Flags,BindingVals).
+exec_single_param(PoolName,Actor,Type,Sql,Flags,BindingVals) ->
 	R = poolboy:transaction(PoolName, fun(Worker) ->
-		gen_server:call(Worker, {call, exec_single_prepare, [Actor,Type,Sql,Flags,BindingVals]})
+		gen_server:call(Worker, {call, exec_single_param, [Actor,tostr(Type),Sql,flags(Flags),fix_binds(BindingVals)]})
 	end),
 	resp(R).
 
@@ -126,13 +127,13 @@ exec_multi(PoolName,[_|_] = Actors, Type, Sql, Flags) ->
 	end),
 	resp(R).
 
-exec_multi_prepare(Actors, Type, Sql,Flags,BindingVals) ->
-	exec_multi_prepare(default_pool,Actors,Type,Sql,Flags,BindingVals).
-exec_multi_prepare(PoolName,[_|_] = Actors, Type, Sql, Flags,BindingVals) ->
-	R = poolboy:transaction(PoolName, fun(Worker) ->
-		gen_server:call(Worker, {call, exec_multi_prepare, [Actors,Type,Sql,Flags,BindingVals]})
-	end),
-	resp(R).
+% exec_multi_prepare(Actors, Type, Sql,Flags,BindingVals) ->
+% 	exec_multi_prepare(default_pool,Actors,Type,Sql,Flags,BindingVals).
+% exec_multi_prepare(PoolName,[_|_] = Actors, Type, Sql, Flags,BindingVals) ->
+% 	R = poolboy:transaction(PoolName, fun(Worker) ->
+% 		gen_server:call(Worker, {call, exec_multi_prepare, [Actors,tostr(Type),Sql,flags(Flags),fix_binds(BindingVals)]})
+% 	end),
+% 	resp(R).
 
 exec_all(Type,Sql,Flags) ->
 	exec_all(default_pool,Type,Sql,Flags).
@@ -142,13 +143,13 @@ exec_all(PoolName,Type,Sql,Flags) ->
 	end),
 	resp(R).
 
-exec_all_prepare(Type,Sql,Flags,BindingVals) ->
-	exec_all_prepare(default_pool,Type,Sql,Flags,BindingVals).
-exec_all_prepare(PoolName,Type,Sql,Flags,BindingVals) ->
-	R = poolboy:transaction(PoolName, fun(Worker) ->
-		gen_server:call(Worker, {call, exec_all_prepare, [Type,Sql,Flags,BindingVals]})
-	end),
-	resp(R).
+% exec_all_prepare(Type,Sql,Flags,BindingVals) ->
+% 	exec_all_prepare(default_pool,Type,Sql,Flags,BindingVals).
+% exec_all_prepare(PoolName,Type,Sql,Flags,BindingVals) ->
+% 	R = poolboy:transaction(PoolName, fun(Worker) ->
+% 		gen_server:call(Worker, {call, exec_all_prepare, [tostr(Type),Sql,flags(Flags),fix_binds(BindingVals)]})
+% 	end),
+% 	resp(R).
 
 exec(Sql) ->
 	exec(default_pool,Sql).
@@ -158,13 +159,48 @@ exec(PoolName,Sql) ->
 	end),
 	resp(R).
 
-exec_prepare(Sql,BindingVals) ->
-	exec_prepare(default_pool,Sql,BindingVals).
-exec_prepare(PoolName,Sql,BindingVals) ->
+exec_param(Sql,BindingVals) ->
+	exec_param(default_pool,Sql,BindingVals).
+exec_param(PoolName,Sql,BindingVals) ->
 	R = poolboy:transaction(PoolName, fun(Worker) ->
-		gen_server:call(Worker, {call, exec_sql_prepare, [Sql,BindingVals]})
+		gen_server:call(Worker, {call, exec_sql_param, [Sql,fix_binds(BindingVals)]})
 	end),
 	resp(R).
+
+tostr(H) when is_atom(H) ->
+	atom_to_binary(H,latin1);
+tostr(H) ->
+	iolist_to_binary(H).
+
+flags([H|T]) when is_atom(H) ->
+	[atom_to_binary(H,latin1)|flags(T)];
+flags([H|T]) ->
+	[H|flags(T)];
+flags([]) ->
+	[].
+
+fix_binds([H|T]) ->
+	[fix_binds1(H)|fix_binds(T)];
+fix_binds([]) ->
+	[].
+fix_binds1([H|T]) when is_list(H); is_binary(H) ->
+	[#'Val'{text = iolist_to_binary(H)}|fix_binds1(T)];
+fix_binds1([H|T]) when H >= -32768, H =< 32767 ->
+	[#'Val'{smallint = H}|fix_binds1(T)];
+fix_binds1([H|T]) when H >= -2147483648, H =< 2147483647 ->
+	[#'Val'{integer = H}|fix_binds1(T)];
+fix_binds1([H|T]) when is_integer(H) ->
+	[#'Val'{bigint = H}|fix_binds1(T)];
+fix_binds1([H|T]) when is_float(H) ->
+	[#'Val'{real = H}|fix_binds1(T)];
+fix_binds1([H|T]) when H == true; H == false ->
+	[#'Val'{bval = H}|fix_binds1(T)];
+fix_binds1([undefined|T]) ->
+	[#'Val'{isnull = true}|fix_binds1(T)];
+fix_binds1([H|T]) when is_atom(H) ->
+	[#'Val'{text = atom_to_binary(H,latin1)}|fix_binds1(T)];
+fix_binds1([]) ->
+	[].
 
 resp({ok,R}) ->
 	{ok,resp(R)};
@@ -255,7 +291,9 @@ handle_call({call, Func,Params}, _From, P) ->
 		{error,E} ->
 			(catch thrift_client:close(P#dp.conn)),
 			self() ! reconnect,
-			{reply, error1({error,E}), P#dp{conn = {error,E}}}
+			{reply, error1({error,E}), P#dp{conn = {error,E}}};
+		{'EXIT',{badarg,_}} ->
+			{reply,badarg,P}
 	end;
 handle_call(status,_,P) ->
 	case P#dp.conn of
