@@ -72,8 +72,15 @@ start([{_Poolname,_PoolParams, _WorkerParams}|_] =  Pools) ->
 				[] ->
 					[poolboy:stop(PoolName) || {PoolName,_,_} <- Pools],
 					application:stop(?MODULE),
-					hd(R)
+					case hd(R) of
+						{error,closed} ->
+							{error,connection_failed};
+						R1 ->
+							R1
+					end
 			end;
+		{error,closed} ->
+			{error,connection_failed};
 		Err ->
 			Err
 	end.
@@ -391,6 +398,8 @@ do_connect(Props) ->
 				{_,{error,Err}} when Err == closed; Err == econnrefused ->
 					{error,closed}
 			end;
+		{error,econnrefused} ->
+			{error,closed};
 		{_,{error,Err}} when Err == closed; Err == econnrefused ->
 			{error,closed}
 	end.
