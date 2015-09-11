@@ -6,6 +6,7 @@
   {applications, [
                   kernel,
                   stdlib,
+                  crypto,
                   adbt
                  ]},
   {mod, { actordb_client_app, []}},
