@@ -6,21 +6,21 @@
 -include_lib("adbt/src/adbt_constants.hrl").
 % API
 -export([test/0,test/2, start/2, start/1,
-exec_config/1,exec_config/2,
-exec_schema/1,exec_schema/2,
-exec_single/4, exec_single/5,
-exec_single_param/5, exec_single_param/6,
-exec_multi/4,exec_multi/5,
+exec_config/1,exec_config/2,exec_config/3,
+exec_schema/1,exec_schema/2,exec_schema/3,
+exec_single/4, exec_single/5,exec_single/6,
+exec_single_param/5, exec_single_param/6,exec_single_param/7,
+exec_multi/4,exec_multi/5,exec_multi/6,
 % exec_multi_prepare/5,exec_multi_prepare/6,
 % exec_all_prepare/4,exec_all_prepare/5,
-exec_param/2,exec_param/3,
-exec_all/3, exec_all/4,
-exec/1,exec/2,salt/0,salt/1]).
+exec_param/2,exec_param/3,exec_param/4,
+exec_all/3, exec_all/4,exec_all/5,
+exec/1,exec/2,exec/3,salt/0,salt/1]).
 -behaviour(gen_server).
 -behaviour(poolboy_worker).
 -export([start_link/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,code_change/3]).
--export([resp/1]).
+-export([resp/1,resp/2]).
 
 % Usage example
 test() ->
@@ -87,11 +87,13 @@ start([{_Poolname,_PoolParams, _WorkerParams}|_] =  Pools) ->
 
 exec_config(Sql) ->
 	exec_config(default_pool,Sql).
-exec_config(PoolName, Sql) ->
+exec_config(PoolName,Sql) ->
+	exec_config(atom,PoolName,Sql).
+exec_config(KeyType,PoolName, Sql) ->
 	R = poolboy:transaction(PoolName, fun(Worker) ->
 		gen_server:call(Worker, {call, exec_config, [Sql]})
 	end),
-	resp(R).
+	resp(KeyType,R).
 
 salt() ->
 	salt(default_pool).
@@ -99,40 +101,48 @@ salt(PoolName) ->
 	R = poolboy:transaction(PoolName, fun(Worker) ->
 		gen_server:call(Worker, {call, salt, []})
 	end),
-	resp(R).
+	resp(atom,R).
 
 exec_schema(Sql) ->
-	exec_schema(default_pool,Sql).
-exec_schema(PoolName, Sql) ->
+	exec_schema(atom,default_pool,Sql).
+exec_schema(PoolName,Sql) ->
+	exec_schema(atom,PoolName,Sql).
+exec_schema(KeyType,PoolName, Sql) ->
 	R = poolboy:transaction(PoolName, fun(Worker) ->
 		gen_server:call(Worker, {call, exec_schema, [Sql]})
 	end),
-	resp(R).
+	resp(KeyType,R).
 
 exec_single(Actor,Type,Sql,Flags) ->
-	exec_single(default_pool,Actor,Type,Sql,Flags).
+	exec_single(atom,default_pool,Actor,Type,Sql,Flags).
 exec_single(PoolName,Actor,Type,Sql,Flags) ->
+	exec_single(atom,PoolName,Actor,Type,Sql,Flags).
+exec_single(KeyType,PoolName,Actor,Type,Sql,Flags) ->
 	R = poolboy:transaction(PoolName, fun(Worker) ->
 		gen_server:call(Worker, {call, exec_single, [Actor,tostr(Type),Sql,flags(Flags)]})
 	end),
-	resp(R).
+	resp(KeyType,R).
 
 % Example: actordb_client:exec_single_param("myactor","type1","insert into tab values (?1,?2,?3);",[create],[[20000000,"bigint!",3]]).
 exec_single_param(Actor,Type,Sql,Flags,BindingVals) ->
-	exec_single_param(default_pool,Actor,Type,Sql,Flags,BindingVals).
+	exec_single_param(atom,default_pool,Actor,Type,Sql,Flags,BindingVals).
 exec_single_param(PoolName,Actor,Type,Sql,Flags,BindingVals) ->
+	exec_single_param(atom,PoolName,Actor,Type,Sql,Flags,BindingVals).
+exec_single_param(KeyType,PoolName,Actor,Type,Sql,Flags,BindingVals) ->
 	R = poolboy:transaction(PoolName, fun(Worker) ->
 		gen_server:call(Worker, {call, exec_single_param, [Actor,tostr(Type),Sql,flags(Flags),fix_binds(BindingVals)]})
 	end),
-	resp(R).
+	resp(KeyType,R).
 
 exec_multi(Actors, Type, Sql,Flags) ->
-	exec_multi(default_pool,Actors,Type,Sql,Flags).
-exec_multi(PoolName,[_|_] = Actors, Type, Sql, Flags) ->
+	exec_multi(atom,default_pool,Actors,Type,Sql,Flags).
+exec_multi(PoolName,Actors,Type,Sql,Flags) ->
+	exec_multi(atom,PoolName,Actors,Type,Sql,Flags).
+exec_multi(KeyType,PoolName,[_|_] = Actors, Type, Sql, Flags) ->
 	R = poolboy:transaction(PoolName, fun(Worker) ->
 		gen_server:call(Worker, {call, exec_multi, [Actors,Type,Sql,Flags]})
 	end),
-	resp(R).
+	resp(KeyType,R).
 
 % exec_multi_prepare(Actors, Type, Sql,Flags,BindingVals) ->
 % 	exec_multi_prepare(default_pool,Actors,Type,Sql,Flags,BindingVals).
@@ -143,12 +153,14 @@ exec_multi(PoolName,[_|_] = Actors, Type, Sql, Flags) ->
 % 	resp(R).
 
 exec_all(Type,Sql,Flags) ->
-	exec_all(default_pool,Type,Sql,Flags).
+	exec_all(atom,default_pool,Type,Sql,Flags).
 exec_all(PoolName,Type,Sql,Flags) ->
+	exec_all(atom,PoolName,Type,Sql,Flags).
+exec_all(KeyType,PoolName,Type,Sql,Flags) ->
 	R = poolboy:transaction(PoolName, fun(Worker) ->
 		gen_server:call(Worker, {call, exec_all, [Type,Sql,Flags]})
 	end),
-	resp(R).
+	resp(KeyType,R).
 
 % exec_all_prepare(Type,Sql,Flags,BindingVals) ->
 % 	exec_all_prepare(default_pool,Type,Sql,Flags,BindingVals).
@@ -159,20 +171,24 @@ exec_all(PoolName,Type,Sql,Flags) ->
 % 	resp(R).
 
 exec(Sql) ->
-	exec(default_pool,Sql).
+	exec(atom,default_pool,Sql).
 exec(PoolName,Sql) ->
+	exec(atom,PoolName,Sql).
+exec(KeyType, PoolName, Sql) ->
 	R = poolboy:transaction(PoolName, fun(Worker) ->
 		gen_server:call(Worker, {call, exec_sql, [Sql]})
 	end),
-	resp(R).
+	resp(KeyType,R).
 
 exec_param(Sql,BindingVals) ->
-	exec_param(default_pool,Sql,BindingVals).
+	exec_param(atom,default_pool,Sql,BindingVals).
 exec_param(PoolName,Sql,BindingVals) ->
+	exec_param(atom,PoolName,Sql,BindingVals).
+exec_param(KeyType,PoolName,Sql,BindingVals) ->
 	R = poolboy:transaction(PoolName, fun(Worker) ->
 		gen_server:call(Worker, {call, exec_sql_param, [Sql,fix_binds(BindingVals)]})
 	end),
-	resp(R).
+	resp(KeyType,R).
 
 tostr(H) when is_atom(H) ->
 	atom_to_binary(H,latin1);
@@ -209,37 +225,43 @@ fix_binds1([H|T]) when is_atom(H) ->
 fix_binds1([]) ->
 	[].
 
-resp({ok,R}) ->
-	{ok,resp(R)};
-resp([M|T]) when is_map(M) ->
-	[resp(X) || X <- [M|T]];
-resp(M) when is_map(M) ->
-	maps:from_list([{binary_to_atom(K,latin1),resp(V)} || {K,V} <- maps:to_list(M)]);
-resp(#'Val'{bigint = V}) when is_integer(V) ->
-	V;
-resp(#'Val'{integer = V}) when is_integer(V) ->
-	V;
-resp(#'Val'{smallint = V}) when is_integer(V) ->
-	V;
-resp(#'Val'{real = V}) when is_float(V) ->
-	V;
-resp(#'Val'{bval = V}) when V == true; V == false ->
-	V;
-resp(#'Val'{text = V}) when is_binary(V); is_list(V) ->
-	V;
-resp(#'Val'{isnull = true}) ->
-	undefined;
-resp(#'Result'{rdRes = undefined, wrRes = Write}) ->
-	resp(Write);
-resp(#'Result'{rdRes = Read, wrRes = undefined}) ->
-	resp(Read);
-resp(#'ReadResult'{hasMore = More, rows = Rows}) ->
-	{More,resp(Rows)};
-resp(#'WriteResult'{lastChangeRowid = LC, rowsChanged = NChanged}) ->
-	{changes,LC,NChanged};
-resp(#'InvalidRequestException'{code = C, info = I}) ->
-	{error,{C,I}};
 resp(R) ->
+	resp(atom,R).
+resp(KeyType,{ok,R}) ->
+	{ok,resp(KeyType,R)};
+resp(KeyType,[M|T]) when is_map(M) ->
+	[resp(KeyType,X) || X <- [M|T]];
+resp(atom,M) when is_map(M) ->
+	maps:from_list([{binary_to_atom(K,latin1),resp(V)} || {K,V} <- maps:to_list(M)]);
+resp(binary,M) when is_map(M) ->
+	maps:from_list([{K,resp(V)} || {K,V} <- maps:to_list(M)]);
+resp(list,M) when is_map(M) ->
+	maps:from_list([{binary_to_list(K),resp(V)} || {K,V} <- maps:to_list(M)]);
+resp(_,#'Val'{bigint = V}) when is_integer(V) ->
+	V;
+resp(_,#'Val'{integer = V}) when is_integer(V) ->
+	V;
+resp(_,#'Val'{smallint = V}) when is_integer(V) ->
+	V;
+resp(_,#'Val'{real = V}) when is_float(V) ->
+	V;
+resp(_,#'Val'{bval = V}) when V == true; V == false ->
+	V;
+resp(_,#'Val'{text = V}) when is_binary(V); is_list(V) ->
+	V;
+resp(_,#'Val'{isnull = true}) ->
+	undefined;
+resp(TT,#'Result'{rdRes = undefined, wrRes = Write}) ->
+	resp(TT,Write);
+resp(TT,#'Result'{rdRes = Read, wrRes = undefined}) ->
+	resp(TT,Read);
+resp(TT,#'ReadResult'{hasMore = More, rows = Rows}) ->
+	{More,resp(TT,Rows)};
+resp(_,#'WriteResult'{lastChangeRowid = LC, rowsChanged = NChanged}) ->
+	{changes,LC,NChanged};
+resp(_,#'InvalidRequestException'{code = C, info = I}) ->
+	{error,{C,I}};
+resp(_,R) ->
 	R.
 
 
