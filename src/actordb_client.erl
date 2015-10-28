@@ -15,7 +15,11 @@ exec_multi/4,exec_multi/5,exec_multi/6,
 % exec_all_prepare/4,exec_all_prepare/5,
 exec_param/2,exec_param/3,exec_param/4,
 exec_all/3, exec_all/4,exec_all/5,
-exec/1,exec/2,exec/3,salt/0,salt/1]).
+exec/1,exec/2,exec/3,salt/0,salt/1,
+uniqid/0,uniqid/1,
+actor_types/0, actor_types/1,
+actor_tables/1, actor_tables/2,
+actor_columns/2, actor_columns/3]).
 -behaviour(gen_server).
 -behaviour(poolboy_worker).
 -export([start_link/1]).
@@ -94,6 +98,40 @@ exec_config(KeyType,PoolName, Sql) ->
 		gen_server:call(Worker, {call, exec_config, [Sql]})
 	end),
 	resp(KeyType,R).
+
+uniqid() ->
+	uniqid(default_pool).
+uniqid(PoolName) ->
+	poolboy:transaction(PoolName, fun(Worker) ->
+		gen_server:call(Worker, {call, uniqid, []})
+	end).
+
+actor_types() ->
+	actor_types(default_pool).
+actor_types(PoolName) ->
+	poolboy:transaction(PoolName, fun(Worker) ->
+		gen_server:call(Worker, {call, actor_types, []})
+	end).
+
+actor_tables(ActorType) ->
+	actor_tables(default_pool,ActorType).
+actor_tables(PoolName,ActorType) when is_atom(ActorType) ->
+	actor_tables(PoolName,atom_to_binary(ActorType,utf8));
+actor_tables(PoolName,ActorType) ->
+	poolboy:transaction(PoolName, fun(Worker) ->
+		gen_server:call(Worker, {call, actor_tables, [ActorType]})
+	end).
+
+actor_columns(ActorType, Table) ->
+	actor_columns(default_pool,ActorType, Table).
+actor_columns(PoolName, ActorType, Table) when is_atom(ActorType) ->
+	actor_columns(PoolName,atom_to_binary(ActorType,utf8), Table);
+actor_columns(PoolName, ActorType, Table) when is_atom(Table) ->
+	actor_columns(PoolName,ActorType,atom_to_binary(Table,utf8));
+actor_columns(PoolName,ActorType, Table) ->
+	poolboy:transaction(PoolName, fun(Worker) ->
+		gen_server:call(Worker, {call, actor_columns, [ActorType, Table]})
+	end).
 
 salt() ->
 	salt(default_pool).
