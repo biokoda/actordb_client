@@ -13,7 +13,9 @@ Value returned from actordb_client:config/0,1,2,3 is an optional first parameter
 For a list of possible error results check actordb_client:error1 function.
 
 Successful results are:
-{ok,{changes,LastInsertRowid,RowsChanged}}
-{ok,{HasMore,ListOfMaps}}
+
+- {ok,{changes,LastInsertRowid,RowsChanged}}
+
+- {ok,{HasMore,ListOfMaps}}
 
 At the moment HasMore is always false.
