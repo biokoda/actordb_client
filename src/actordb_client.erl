@@ -96,6 +96,10 @@ start([{_Poolname,_PoolParams, _WorkerParams}|_] =  Pools) ->
 
 config() ->
 	#adbc{}.
+config([{_,_}|_] = L) when is_list(L) ->
+	#adbc{pool_name = proplists:get_value(pool_name, L, default_pool),
+		key_type = proplists:get_value(key_type, L, atom),
+		query_timeout = proplists:get_value(query_timeout, L, infinity)};
 config(PoolName) ->
 	#adbc{pool_name = PoolName}.
 config(PoolName, QueryTimeout) ->
