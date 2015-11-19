@@ -296,6 +296,8 @@ resp(_,#'Val'{text = V}) when is_binary(V); is_list(V) ->
 	V;
 resp(_,#'Val'{isnull = true}) ->
 	undefined;
+resp(_,#'Val'{bin = V})  when is_binary(V); is_list(V) ->
+	V;
 resp(TT,#'Result'{rdRes = undefined, wrRes = Write}) ->
 	resp(TT,Write);
 resp(TT,#'Result'{rdRes = Read, wrRes = undefined}) ->
