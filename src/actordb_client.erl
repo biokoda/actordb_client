@@ -248,6 +248,8 @@ fix_binds([]) ->
 	[].
 fix_binds1([H|T]) when is_list(H); is_binary(H) ->
 	[#'Val'{text = iolist_to_binary(H)}|fix_binds1(T)];
+fix_binds1([{blob,V}|T]) ->
+	[#'Val'{bin = iolist_to_binary(V)}|fix_binds1(T)];
 fix_binds1([H|T]) when H >= -32768, H =< 32767 ->
 	[#'Val'{smallint = H}|fix_binds1(T)];
 fix_binds1([H|T]) when H >= -2147483648, H =< 2147483647 ->
