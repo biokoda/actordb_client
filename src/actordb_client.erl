@@ -242,24 +242,32 @@ fix_binds([H|T]) ->
 	[fix_binds1(H)|fix_binds(T)];
 fix_binds([]) ->
 	[].
-fix_binds1([H|T]) when is_list(H); is_binary(H) ->
-	[#'Val'{text = iolist_to_binary(H)}|fix_binds1(T)];
+fix_binds1([undefined|T]) ->
+	[#'Val'{isnull = true}|fix_binds1(T)];
+fix_binds1([null|T]) ->
+	[#'Val'{isnull = true}|fix_binds1(T)];
+fix_binds1([true|T]) ->
+	[#'Val'{bval = true}|fix_binds1(T)];
+fix_binds1([false|T]) ->
+	[#'Val'{bval = false}|fix_binds1(T)];
 fix_binds1([{blob,V}|T]) ->
 	[#'Val'{blob = iolist_to_binary(V)}|fix_binds1(T)];
+fix_binds1([[_|_] = H|T]) ->
+	[#'Val'{text = unicode:characters_to_binary(H)}|fix_binds1(T)];
+fix_binds1([[]|T]) ->
+	[#'Val'{text = <<>>}|fix_binds1(T)];
+fix_binds1([<<_/binary>> = H|T]) ->
+	[#'Val'{text = H}|fix_binds1(T)];
+fix_binds1([H|T]) when is_atom(H) ->
+	[#'Val'{text = atom_to_binary(H,latin1)}|fix_binds1(T)];
+fix_binds1([H|T]) when is_float(H) ->
+	[#'Val'{real = H}|fix_binds1(T)];
 fix_binds1([H|T]) when H >= -32768, H =< 32767 ->
 	[#'Val'{smallint = H}|fix_binds1(T)];
 fix_binds1([H|T]) when H >= -2147483648, H =< 2147483647 ->
 	[#'Val'{integer = H}|fix_binds1(T)];
 fix_binds1([H|T]) when is_integer(H) ->
 	[#'Val'{bigint = H}|fix_binds1(T)];
-fix_binds1([H|T]) when is_float(H) ->
-	[#'Val'{real = H}|fix_binds1(T)];
-fix_binds1([H|T]) when H == true; H == false ->
-	[#'Val'{bval = H}|fix_binds1(T)];
-fix_binds1([undefined|T]) ->
-	[#'Val'{isnull = true}|fix_binds1(T)];
-fix_binds1([H|T]) when is_atom(H) ->
-	[#'Val'{text = atom_to_binary(H,latin1)}|fix_binds1(T)];
 fix_binds1([]) ->
 	[].
 
