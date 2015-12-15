@@ -67,23 +67,24 @@ start([{_Poolname,_PoolParams, _WorkerParams}|_] =  Pools) ->
 		{ok,_} ->
 			% Check in every pool if connection succeeded.
 			% If any ok, return ok (workers try other connections if their set one fails)
-			R = [poolboy:transaction(PoolName, fun(Worker) ->
-				gen_server:call(Worker, status) end) || {PoolName,_,_} <- Pools],
-			case [ok || ok <- R] of
-				[ok|_] ->
-					ok;
-				[] ->
-					[poolboy:stop(PoolName) || {PoolName,_,_} <- Pools],
-					application:stop(?MODULE),
-					case hd(R) of
-						{error,closed} ->
-							{error,connection_failed};
-						R1 ->
-							R1
-					end
-			end;
-		{error,closed} ->
-			{error,connection_failed};
+			% R = [poolboy:transaction(PoolName, fun(Worker) ->
+			% 	gen_server:call(Worker, status) end) || {PoolName,_,_} <- Pools],
+			% case [ok || ok <- R] of
+			% 	[ok|_] ->
+			% 		ok;
+			% 	[] ->
+			% 		[poolboy:stop(PoolName) || {PoolName,_,_} <- Pools],
+			% 		application:stop(?MODULE),
+			% 		case hd(R) of
+			% 			{error,closed} ->
+			% 				{error,connection_failed};
+			% 			R1 ->
+			% 				R1
+			% 		end
+			% end;
+			ok;
+		% {error,closed} ->
+		% 	{error,connection_failed};
 		Err ->
 			Err
 	end.
@@ -492,6 +493,8 @@ randelem(Args) ->
 
 error1(E) ->
 	case E of
+		{error,closed} ->
+			{error,connection_failed};
 		{error,X} ->
 			error1(X);
 		{'InvalidRequestException',?ADBT_ERRORCODE_LOGINFAILED, Msg} ->
