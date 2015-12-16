@@ -29,7 +29,7 @@ start_children() ->
 				poolboy:child_spec(Name, PoolArgs, WorkerArgs)
 			end, Pools)
 	end,
-	[supervisor:start_child(C) || C <- PoolSpecs].
+	[supervisor:start_child(?MODULE, C) || C <- PoolSpecs].
 
 %% ===================================================================
 %% Supervisor callbacks
