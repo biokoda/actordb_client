@@ -65,6 +65,7 @@ start([{_Poolname,_PoolParams, _WorkerParams}|_] =  Pools) ->
 	ok = application:set_env(actordb_client, pools,Pools),
 	case application:ensure_all_started(?MODULE) of
 		{ok,_} ->
+			actordb_client_sup:start_children(),
 			% Check in every pool if connection succeeded.
 			% If any ok, return ok (workers try other connections if their set one fails)
 			% R = [poolboy:transaction(PoolName, fun(Worker) ->

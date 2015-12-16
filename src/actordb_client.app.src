@@ -7,7 +7,9 @@
                   kernel,
                   stdlib,
                   crypto,
-                  adbt
+                  adbt,
+                  poolboy,
+                  thrift
                  ]},
   {mod, { actordb_client_app, []}},
   {env, []}
