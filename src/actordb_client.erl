@@ -17,7 +17,8 @@ exec/1,exec/2,salt/0,salt/1,
 uniqid/0,uniqid/1,
 actor_types/0, actor_types/1,
 actor_tables/1, actor_tables/2,
-actor_columns/2, actor_columns/3]).
+actor_columns/2, actor_columns/3,
+prot_version/0]).
 -behaviour(gen_server).
 -behaviour(poolboy_worker).
 -export([start_link/1]).
@@ -66,26 +67,7 @@ start([{_Poolname,_PoolParams, _WorkerParams}|_] =  Pools) ->
 	case application:ensure_all_started(?MODULE) of
 		{ok,_} ->
 			actordb_client_sup:start_children(),
-			% Check in every pool if connection succeeded.
-			% If any ok, return ok (workers try other connections if their set one fails)
-			% R = [poolboy:transaction(PoolName, fun(Worker) ->
-			% 	gen_server:call(Worker, status) end) || {PoolName,_,_} <- Pools],
-			% case [ok || ok <- R] of
-			% 	[ok|_] ->
-			% 		ok;
-			% 	[] ->
-			% 		[poolboy:stop(PoolName) || {PoolName,_,_} <- Pools],
-			% 		application:stop(?MODULE),
-			% 		case hd(R) of
-			% 			{error,closed} ->
-			% 				{error,connection_failed};
-			% 			R1 ->
-			% 				R1
-			% 		end
-			% end;
 			ok;
-		% {error,closed} ->
-		% 	{error,connection_failed};
 		Err ->
 			Err
 	end.
@@ -228,6 +210,12 @@ exec_param(C,Sql,BindingVals) ->
 	end,C#adbc.query_timeout),
 	resp(C#adbc.key_type,R).
 
+prot_version() ->
+	C = #adbc{},
+	poolboy:transaction(C#adbc.pool_name, fun(Worker) ->
+		gen_server:call(Worker, {call, protocolVersion, []})
+	end,C#adbc.query_timeout).
+
 tostr(H) when is_atom(H) ->
 	atom_to_binary(H,latin1);
 tostr(H) ->
@@ -322,7 +310,7 @@ resp(_,R) ->
 	R.
 
 
--record(dp, {conn, hostinfo = [], otherhosts = [], callqueue = queue:new(), tryconn}).
+-record(dp, {conn, hostinfo = [], otherhosts = [], callqueue = queue:new(), tryconn, rii = 0}).
 
 start_link(Args) ->
 	gen_server:start_link(?MODULE, Args, []).
@@ -337,6 +325,7 @@ init(Args) ->
 			Props = randelem(Args),
 			Other = Args -- [Props]
 	end,
+	erlang:send_after(100,self(),check),
 	case catch do_connect(Props) of
 		{ok,C1} ->
 			{ok, #dp{conn=C1, hostinfo = Props, otherhosts = Other}};
@@ -362,24 +351,24 @@ handle_call({call, Func,Params}, _From, P) ->
 	Result = (catch thrift_client:call(P#dp.conn, Func, Params)),
 	case Result of
 		{C,{ok, Reply}} ->
-			{reply, {ok, Reply}, P#dp{conn = C}};
+			{reply, {ok, Reply}, P#dp{conn = C, rii = P#dp.rii+1}};
 		{C,{exception,Msg}} ->
-			{reply, {ok, Msg}, P#dp{conn = C}};
+			{reply, {ok, Msg}, P#dp{conn = C, rii = P#dp.rii+1}};
 		{_,{error,Msg}} when Msg == closed; Msg == econnrefused ->
 			(catch thrift_client:close(P#dp.conn)),
 			self() ! reconnect,
 			% lager:error("Connection lost to ~p",[proplists:get_value(hostname, P#dp.hostinfo)]),
-			{reply,error1({error,Msg}),P#dp{conn = {error,closed}}};
+			{reply,error1({error,Msg}),P#dp{conn = {error,closed}, rii = P#dp.rii+1}};
 		{_, {error, Msg}} ->
 			(catch thrift_client:close(P#dp.conn)),
 			self() ! reconnect,
-			{reply,error1({error, Msg}), P#dp{conn = {error,Msg}}};
+			{reply,error1({error, Msg}), P#dp{conn = {error,Msg}, rii = P#dp.rii+1}};
 		{error,E} ->
 			(catch thrift_client:close(P#dp.conn)),
 			self() ! reconnect,
-			{reply, error1({error,E}), P#dp{conn = {error,E}}};
+			{reply, error1({error,E}), P#dp{conn = {error,E}, rii = P#dp.rii+1}};
 		{'EXIT',{badarg,_}} ->
-			{reply,badarg,P}
+			{reply,badarg,P#dp{rii = P#dp.rii+1}}
 	end;
 handle_call(status,_,P) ->
 	case P#dp.conn of
@@ -392,6 +381,18 @@ handle_call(status,_,P) ->
 handle_cast(_Msg, State) ->
 	{noreply, State}.
 
+handle_info(check, P) ->
+	erlang:send_after(100,self(),check),
+	case P#dp.conn of
+		{error,_} ->
+			ok;
+		_ when P#dp.rii == 0 ->
+			Me = self(),
+			spawn(fun() -> gen_server:call(Me, {call, actor_types,[]}) end);
+		_ ->
+			ok
+	end,
+	{noreply, P#dp{rii = 0}};
 handle_info(reconnect,#dp{conn = {error,_}} = P) ->
 	case do_connect(P#dp.hostinfo) of
 		{ok,C} ->
