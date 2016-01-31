@@ -3,7 +3,7 @@
 -behaviour(supervisor).
 
 %% API
--export([start_link/0, start_children/0]).
+-export([start_link/0, start_children/1]).
 
 %% Supervisor callbacks
 -export([init/1]).
@@ -18,18 +18,13 @@
 start_link() ->
 	supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
-start_children() ->
-	case application:get_env(actordb_client, pools) of
-		undefined ->
-			PoolSpecs = [];
-		{ok, Pools} ->
-			PoolSpecs = lists:map(fun({Name, SizeArgs, WorkerArgs}) ->
-				PoolArgs = [{name, {local, Name}},
-					{worker_module, actordb_client}] ++ SizeArgs,
-				poolboy:child_spec(Name, PoolArgs, WorkerArgs)
-			end, Pools)
-	end,
-	[supervisor:start_child(?MODULE, C) || C <- PoolSpecs].
+start_children(Pools) ->
+	PoolSpecs = lists:map(fun({Name, SizeArgs, WorkerArgs}) ->
+		PoolArgs = [{name, {local, Name}},
+			{worker_module, actordb_client}] ++ SizeArgs,
+		poolboy:child_spec(Name, PoolArgs, WorkerArgs)
+	end, Pools),
+	[{ok,_} = supervisor:start_child(?MODULE, C) || C <- PoolSpecs].
 
 %% ===================================================================
 %% Supervisor callbacks

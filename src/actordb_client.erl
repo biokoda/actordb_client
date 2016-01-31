@@ -2,7 +2,7 @@
 -include_lib("adbt/src/adbt_types.hrl").
 -include_lib("adbt/src/adbt_constants.hrl").
 % API
--export([test/0,test/2, start/2, start/1,
+-export([test/0,test/2,test/3, start/2, start/1,
 config/0, config/1,config/2, config/3,
 exec_config/1,exec_config/2,
 exec_schema/1,exec_schema/2,
@@ -28,6 +28,8 @@ prot_version/0]).
 test() ->
 	test("myuser","mypass").
 test(U,Pw) ->
+	test(default_pool, U, Pw).
+test(Name, U, Pw) ->
 	PoolInfo = [{size, 10}, {max_overflow, 5}],
 	% Single host in worker params. Every worker in pool will connect to it.
 	WorkerParams = [{hostname, "127.0.0.1"},
@@ -55,7 +57,7 @@ test(U,Pw) ->
 	%      {port,33306}
 	%    ]
 	% ],
-	start(PoolInfo,WorkerParams).
+	start([{Name, PoolInfo, WorkerParams}]).
 
 % Single pool is most likely sufficient for most situations.
 % WorkerParams can be a single property list (connect to one host)
@@ -63,10 +65,10 @@ test(U,Pw) ->
 start(PoolParams,WorkerParams) ->
 	start([{default_pool,PoolParams,WorkerParams}]).
 start([{_Poolname,_PoolParams, _WorkerParams}|_] =  Pools) ->
-	ok = application:set_env(actordb_client, pools,Pools),
+	% ok = application:set_env(actordb_client, pools,Pools),
 	case application:ensure_all_started(?MODULE) of
 		{ok,_} ->
-			actordb_client_sup:start_children(),
+			actordb_client_sup:start_children(Pools),
 			ok;
 		Err ->
 			Err
