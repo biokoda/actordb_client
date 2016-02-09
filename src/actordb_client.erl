@@ -1,6 +1,6 @@
 -module(actordb_client).
--include_lib("adbt/src/adbt_types.hrl").
--include_lib("adbt/src/adbt_constants.hrl").
+-include_lib("adbt/include/adbt_types.hrl").
+-include_lib("adbt/include/adbt_constants.hrl").
 % API
 -export([test/0,test/2,test/3, start/2, start/1,
 config/0, config/1,config/2, config/3,
