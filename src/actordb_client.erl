@@ -76,6 +76,7 @@ start([{_Poolname,_PoolParams, _WorkerParams}|_] =  Pools) ->
 
 -record(adbc,{key_type = atom, pool_name = default_pool, query_timeout = infinity}).
 
+% Optional config.
 config() ->
 	#adbc{}.
 config([{_,_}|_] = L) when is_list(L) ->
@@ -89,6 +90,8 @@ config(PoolName, QueryTimeout) ->
 config(PoolName, QueryTimeout, KeyType) ->
 	#adbc{pool_name = PoolName, query_timeout = QueryTimeout, key_type = KeyType}.
 
+% Exec query on config database. Queries will work only when logged in with a root user account
+% or if database is uninitalized.
 exec_config(Sql) ->
 	exec_config(#adbc{},Sql).
 exec_config(C, Sql) ->
@@ -97,6 +100,7 @@ exec_config(C, Sql) ->
 	end, C#adbc.query_timeout),
 	resp(C#adbc.key_type,R).
 
+% Get a unique integer id from db.
 uniqid() ->
 	uniqid(#adbc{}).
 uniqid(C) ->
@@ -104,6 +108,7 @@ uniqid(C) ->
 		gen_server:call(Worker, {call, uniqid, []})
 	end,C#adbc.query_timeout).
 
+% Returns list of actor types 
 actor_types() ->
 	actor_types(#adbc{}).
 actor_types(C) ->
@@ -111,6 +116,7 @@ actor_types(C) ->
 		gen_server:call(Worker, {call, actor_types, []})
 	end,C#adbc.query_timeout).
 
+% For an actor type, return list of tables in schema
 actor_tables(ActorType) ->
 	actor_tables(#adbc{},ActorType).
 actor_tables(C,ActorType) when is_atom(ActorType) ->
@@ -120,6 +126,7 @@ actor_tables(C,ActorType) ->
 		gen_server:call(Worker, {call, actor_tables, [ActorType]})
 	end,C#adbc.query_timeout).
 
+% For actor type and table, which columns it has
 actor_columns(ActorType, Table) ->
 	actor_columns(#adbc{},ActorType, Table).
 actor_columns(C, ActorType, Table) when is_atom(ActorType) ->
@@ -131,6 +138,9 @@ actor_columns(C,ActorType, Table) ->
 		gen_server:call(Worker, {call, actor_columns, [ActorType, Table]})
 	end,C#adbc.query_timeout).
 
+% Get salt for safer login. This way password never gets sent over the wire.
+% Then use it like so:
+% SHA1( password ) XOR SHA1( SALT <concat> SHA1( SHA1( password ) ) )
 salt() ->
 	salt(#adbc{}).
 salt(C) ->
@@ -139,6 +149,7 @@ salt(C) ->
 	end,C#adbc.query_timeout),
 	resp(C#adbc.key_type,R).
 
+% Change schema. Must be logged in as root user.
 exec_schema(Sql) ->
 	exec_schema(#adbc{},Sql).
 exec_schema(C,Sql) ->
@@ -147,6 +158,11 @@ exec_schema(C,Sql) ->
 	end,C#adbc.query_timeout),
 	resp(C#adbc.key_type,R).
 
+% Run query on an actor.
+% Actor: name of actor (iolist)
+% Type: actor type
+% Sql: query iolist
+% Flags: [create] or []
 exec_single(Actor,Type,Sql,Flags) ->
 	exec_single(#adbc{},Actor,Type,Sql,Flags).
 exec_single(C,Actor,Type,Sql,Flags) ->
@@ -155,6 +171,12 @@ exec_single(C,Actor,Type,Sql,Flags) ->
 	end,C#adbc.query_timeout),
 	resp(C#adbc.key_type,R).
 
+% Run query on an actor and use parameterized values. This is safer and faster.
+% Actor: name of actor (iolist)
+% Type: actor type
+% Sql: query iolist
+% Flags: [create] or []
+% BindingVals: List of lists. You can insert many rows using a single call.
 % Example: actordb_client:exec_single_param("myactor","type1","insert into tab values (?1,?2,?3);",[create],[[20000000,"bigint!",3]]).
 exec_single_param(Actor,Type,Sql,Flags,BindingVals) ->
 	exec_single_param(#adbc{},Actor,Type,Sql,Flags,BindingVals).
@@ -164,6 +186,11 @@ exec_single_param(C,Actor,Type,Sql,Flags,BindingVals) ->
 	end,C#adbc.query_timeout),
 	resp(C#adbc.key_type,R).
 
+% Run a query over multiple actors.
+% Actors: list of names
+% Type: actor type
+% Sql: query iolist
+% Flags: [create] or []
 exec_multi(Actors, Type, Sql,Flags) ->
 	exec_multi(#adbc{},Actors,Type,Sql,Flags).
 exec_multi(C,[_|_] = Actors, Type, Sql, Flags) ->
@@ -180,6 +207,10 @@ exec_multi(C,[_|_] = Actors, Type, Sql, Flags) ->
 % 	end),
 % 	resp(R).
 
+% Run a type(*) query.
+% Type: actor type
+% Sql: query iolist
+% Flags: [create] or []
 exec_all(Type,Sql,Flags) ->
 	exec_all(#adbc{},Type,Sql,Flags).
 exec_all(C,Type,Sql,Flags) ->
@@ -196,6 +227,7 @@ exec_all(C,Type,Sql,Flags) ->
 % 	end),
 % 	resp(R).
 
+% Run a query that has everything in it. Must start with "actor ..."
 exec(Sql) ->
 	exec(#adbc{},Sql).
 exec(C, Sql) ->
@@ -204,6 +236,7 @@ exec(C, Sql) ->
 	end,C#adbc.query_timeout),
 	resp(C#adbc.key_type,R).
 
+% Run a query that has everything in it and uses parameters. Must start with "actor ..."
 exec_param(Sql,BindingVals) ->
 	exec_param(#adbc{},Sql,BindingVals).
 exec_param(C,Sql,BindingVals) ->
