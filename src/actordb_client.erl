@@ -96,7 +96,7 @@ exec_config(Sql) ->
 	exec_config(#adbc{},Sql).
 exec_config(C, Sql) ->
 	R = poolboy:transaction(C#adbc.pool_name, fun(Worker) ->
-		gen_server:call(Worker, {call, exec_config, [Sql]})
+		gen_server:call(Worker, {call, exec_config, [Sql]}, C#adbc.query_timeout)
 	end, C#adbc.query_timeout),
 	resp(C#adbc.key_type,R).
 
@@ -105,7 +105,7 @@ uniqid() ->
 	uniqid(#adbc{}).
 uniqid(C) ->
 	poolboy:transaction(C#adbc.pool_name, fun(Worker) ->
-		gen_server:call(Worker, {call, uniqid, []})
+		gen_server:call(Worker, {call, uniqid, []}, C#adbc.query_timeout)
 	end,C#adbc.query_timeout).
 
 % Returns list of actor types 
@@ -113,7 +113,7 @@ actor_types() ->
 	actor_types(#adbc{}).
 actor_types(C) ->
 	poolboy:transaction(C#adbc.pool_name, fun(Worker) ->
-		gen_server:call(Worker, {call, actor_types, []})
+		gen_server:call(Worker, {call, actor_types, []}, C#adbc.query_timeout)
 	end,C#adbc.query_timeout).
 
 % For an actor type, return list of tables in schema
@@ -123,7 +123,7 @@ actor_tables(C,ActorType) when is_atom(ActorType) ->
 	actor_tables(C,atom_to_binary(ActorType,utf8));
 actor_tables(C,ActorType) ->
 	poolboy:transaction(C#adbc.pool_name, fun(Worker) ->
-		gen_server:call(Worker, {call, actor_tables, [ActorType]})
+		gen_server:call(Worker, {call, actor_tables, [ActorType]}, C#adbc.query_timeout)
 	end,C#adbc.query_timeout).
 
 % For actor type and table, which columns it has
@@ -135,7 +135,7 @@ actor_columns(C, ActorType, Table) when is_atom(Table) ->
 	actor_columns(C,ActorType,atom_to_binary(Table,utf8));
 actor_columns(C,ActorType, Table) ->
 	poolboy:transaction(C#adbc.pool_name, fun(Worker) ->
-		gen_server:call(Worker, {call, actor_columns, [ActorType, Table]})
+		gen_server:call(Worker, {call, actor_columns, [ActorType, Table]}, C#adbc.query_timeout)
 	end,C#adbc.query_timeout).
 
 % Get salt for safer login. This way password never gets sent over the wire.
@@ -145,7 +145,7 @@ salt() ->
 	salt(#adbc{}).
 salt(C) ->
 	R = poolboy:transaction(C#adbc.pool_name, fun(Worker) ->
-		gen_server:call(Worker, {call, salt, []})
+		gen_server:call(Worker, {call, salt, []}, C#adbc.query_timeout)
 	end,C#adbc.query_timeout),
 	resp(C#adbc.key_type,R).
 
@@ -154,7 +154,7 @@ exec_schema(Sql) ->
 	exec_schema(#adbc{},Sql).
 exec_schema(C,Sql) ->
 	R = poolboy:transaction(C#adbc.pool_name, fun(Worker) ->
-		gen_server:call(Worker, {call, exec_schema, [Sql]})
+		gen_server:call(Worker, {call, exec_schema, [Sql]}, C#adbc.query_timeout)
 	end,C#adbc.query_timeout),
 	resp(C#adbc.key_type,R).
 
@@ -167,7 +167,7 @@ exec_single(Actor,Type,Sql,Flags) ->
 	exec_single(#adbc{},Actor,Type,Sql,Flags).
 exec_single(C,Actor,Type,Sql,Flags) ->
 	R = poolboy:transaction(C#adbc.pool_name, fun(Worker) ->
-		gen_server:call(Worker, {call, exec_single, [Actor,tostr(Type),Sql,flags(Flags)]})
+		gen_server:call(Worker, {call, exec_single, [Actor,tostr(Type),Sql,flags(Flags)]}, C#adbc.query_timeout)
 	end,C#adbc.query_timeout),
 	resp(C#adbc.key_type,R).
 
@@ -182,7 +182,8 @@ exec_single_param(Actor,Type,Sql,Flags,BindingVals) ->
 	exec_single_param(#adbc{},Actor,Type,Sql,Flags,BindingVals).
 exec_single_param(C,Actor,Type,Sql,Flags,BindingVals) ->
 	R = poolboy:transaction(C#adbc.pool_name, fun(Worker) ->
-		gen_server:call(Worker, {call, exec_single_param, [Actor,tostr(Type),Sql,flags(Flags),fix_binds(BindingVals)]})
+		gen_server:call(Worker, 
+			{call, exec_single_param, [Actor,tostr(Type),Sql,flags(Flags),fix_binds(BindingVals)]},C#adbc.query_timeout)
 	end,C#adbc.query_timeout),
 	resp(C#adbc.key_type,R).
 
@@ -195,7 +196,7 @@ exec_multi(Actors, Type, Sql,Flags) ->
 	exec_multi(#adbc{},Actors,Type,Sql,Flags).
 exec_multi(C,[_|_] = Actors, Type, Sql, Flags) ->
 	R = poolboy:transaction(C#adbc.pool_name, fun(Worker) ->
-		gen_server:call(Worker, {call, exec_multi, [Actors,Type,Sql,Flags]})
+		gen_server:call(Worker, {call, exec_multi, [Actors,Type,Sql,Flags]},C#adbc.query_timeout)
 	end,C#adbc.query_timeout),
 	resp(C#adbc.key_type,R).
 
@@ -215,7 +216,7 @@ exec_all(Type,Sql,Flags) ->
 	exec_all(#adbc{},Type,Sql,Flags).
 exec_all(C,Type,Sql,Flags) ->
 	R = poolboy:transaction(C#adbc.pool_name, fun(Worker) ->
-		gen_server:call(Worker, {call, exec_all, [Type,Sql,Flags]})
+		gen_server:call(Worker, {call, exec_all, [Type,Sql,Flags]},C#adbc.query_timeout)
 	end,C#adbc.query_timeout),
 	resp(C#adbc.key_type,R).
 
@@ -232,7 +233,7 @@ exec(Sql) ->
 	exec(#adbc{},Sql).
 exec(C, Sql) ->
 	R = poolboy:transaction(C#adbc.pool_name, fun(Worker) ->
-		gen_server:call(Worker, {call, exec_sql, [Sql]})
+		gen_server:call(Worker, {call, exec_sql, [Sql]},C#adbc.query_timeout)
 	end,C#adbc.query_timeout),
 	resp(C#adbc.key_type,R).
 
@@ -241,14 +242,14 @@ exec_param(Sql,BindingVals) ->
 	exec_param(#adbc{},Sql,BindingVals).
 exec_param(C,Sql,BindingVals) ->
 	R = poolboy:transaction(C#adbc.pool_name, fun(Worker) ->
-		gen_server:call(Worker, {call, exec_sql_param, [Sql,fix_binds(BindingVals)]})
+		gen_server:call(Worker, {call, exec_sql_param, [Sql,fix_binds(BindingVals)]},C#adbc.query_timeout)
 	end,C#adbc.query_timeout),
 	resp(C#adbc.key_type,R).
 
 prot_version() ->
 	C = #adbc{},
 	poolboy:transaction(C#adbc.pool_name, fun(Worker) ->
-		gen_server:call(Worker, {call, protocolVersion, []})
+		gen_server:call(Worker, {call, protocolVersion, []},C#adbc.query_timeout)
 	end,C#adbc.query_timeout).
 
 tostr(H) when is_atom(H) ->
@@ -392,15 +393,17 @@ handle_call({call, Func,Params}, _From, P) ->
 		{_,{error,Msg}} when Msg == closed; Msg == econnrefused ->
 			(catch thrift_client:close(P#dp.conn)),
 			self() ! reconnect,
-			% lager:error("Connection lost to ~p",[proplists:get_value(hostname, P#dp.hostinfo)]),
+			error_logger:format("Connection lost to ~p~n",[proplists:get_value(hostname, P#dp.hostinfo)]),
 			{reply,error1({error,Msg}),P#dp{conn = {error,closed}, rii = P#dp.rii+1}};
 		{_, {error, Msg}} ->
 			(catch thrift_client:close(P#dp.conn)),
 			self() ! reconnect,
+			error_logger:format("reconnecting to db due to error"),
 			{reply,error1({error, Msg}), P#dp{conn = {error,Msg}, rii = P#dp.rii+1}};
 		{error,E} ->
 			(catch thrift_client:close(P#dp.conn)),
 			self() ! reconnect,
+			error_logger:format("reconnecting to db due to error"),
 			{reply, error1({error,E}), P#dp{conn = {error,E}, rii = P#dp.rii+1}};
 		{'EXIT',{badarg,_}} ->
 			{reply,badarg,P#dp{rii = P#dp.rii+1}}
