@@ -389,6 +389,14 @@ handle_call({call, Func,Params}, _From, P) ->
 		{C,{ok, Reply}} ->
 			{reply, {ok, Reply}, P#dp{conn = C, rii = P#dp.rii+1}};
 		{C,{exception,Msg}} ->
+			case error1(Msg) of
+				{error,{not_logged_in,_}} ->
+					self() ! reconnect;
+				{error,{Err,_}} when is_atom(Err) ->
+					ok;
+				_ ->
+					self() ! reconnect
+			end,
 			{reply, {ok, Msg}, P#dp{conn = C, rii = P#dp.rii+1}};
 		{_,{error,Msg}} when Msg == closed; Msg == econnrefused ->
 			(catch thrift_client:close(P#dp.conn)),
