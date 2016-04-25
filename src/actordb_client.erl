@@ -74,15 +74,17 @@ start([{_Poolname,_PoolParams, _WorkerParams}|_] =  Pools) ->
 			Err
 	end.
 
--record(adbc,{key_type = atom, pool_name = default_pool, query_timeout = infinity}).
+-record(adbc,{key_type = atom, pool_name = default_pool, query_timeout = infinity, blob_tuple = false}).
 
 % Optional config.
 config() ->
 	#adbc{}.
 config([{_,_}|_] = L) when is_list(L) ->
-	#adbc{pool_name = proplists:get_value(pool_name, L, default_pool),
-		key_type = proplists:get_value(key_type, L, atom),
-		query_timeout = proplists:get_value(query_timeout, L, infinity)};
+	Def = #adbc{},
+	#adbc{pool_name = proplists:get_value(pool_name, L, Def#adbc.pool_name),
+		key_type = proplists:get_value(key_type, L, Def#adbc.key_type),
+		blob_tuple = proplists:get_value(blob_tuple, L, Def#adbc.blob_tuple),
+		query_timeout = proplists:get_value(query_timeout, L, Def#adbc.query_timeout)};
 config(PoolName) ->
 	#adbc{pool_name = PoolName}.
 config(PoolName, QueryTimeout) ->
@@ -98,7 +100,7 @@ exec_config(C, Sql) ->
 	R = poolboy:transaction(C#adbc.pool_name, fun(Worker) ->
 		gen_server:call(Worker, {call, exec_config, [Sql]}, C#adbc.query_timeout)
 	end, C#adbc.query_timeout),
-	resp(C#adbc.key_type,R).
+	resp(C,R).
 
 % Get a unique integer id from db.
 uniqid() ->
@@ -147,7 +149,7 @@ salt(C) ->
 	R = poolboy:transaction(C#adbc.pool_name, fun(Worker) ->
 		gen_server:call(Worker, {call, salt, []}, C#adbc.query_timeout)
 	end,C#adbc.query_timeout),
-	resp(C#adbc.key_type,R).
+	resp(C,R).
 
 % Change schema. Must be logged in as root user.
 exec_schema(Sql) ->
@@ -156,7 +158,7 @@ exec_schema(C,Sql) ->
 	R = poolboy:transaction(C#adbc.pool_name, fun(Worker) ->
 		gen_server:call(Worker, {call, exec_schema, [Sql]}, C#adbc.query_timeout)
 	end,C#adbc.query_timeout),
-	resp(C#adbc.key_type,R).
+	resp(C,R).
 
 % Run query on an actor.
 % Actor: name of actor (iolist)
@@ -169,7 +171,7 @@ exec_single(C,Actor,Type,Sql,Flags) ->
 	R = poolboy:transaction(C#adbc.pool_name, fun(Worker) ->
 		gen_server:call(Worker, {call, exec_single, [Actor,tostr(Type),Sql,flags(Flags)]}, C#adbc.query_timeout)
 	end,C#adbc.query_timeout),
-	resp(C#adbc.key_type,R).
+	resp(C,R).
 
 % Run query on an actor and use parameterized values. This is safer and faster.
 % Actor: name of actor (iolist)
@@ -185,7 +187,7 @@ exec_single_param(C,Actor,Type,Sql,Flags,BindingVals) ->
 		gen_server:call(Worker, 
 			{call, exec_single_param, [Actor,tostr(Type),Sql,flags(Flags),fix_binds(BindingVals)]},C#adbc.query_timeout)
 	end,C#adbc.query_timeout),
-	resp(C#adbc.key_type,R).
+	resp(C,R).
 
 % Run a query over multiple actors.
 % Actors: list of names
@@ -198,7 +200,7 @@ exec_multi(C,[_|_] = Actors, Type, Sql, Flags) ->
 	R = poolboy:transaction(C#adbc.pool_name, fun(Worker) ->
 		gen_server:call(Worker, {call, exec_multi, [Actors,Type,Sql,Flags]},C#adbc.query_timeout)
 	end,C#adbc.query_timeout),
-	resp(C#adbc.key_type,R).
+	resp(C,R).
 
 % exec_multi_prepare(Actors, Type, Sql,Flags,BindingVals) ->
 % 	exec_multi_prepare(default_pool,Actors,Type,Sql,Flags,BindingVals).
@@ -218,7 +220,7 @@ exec_all(C,Type,Sql,Flags) ->
 	R = poolboy:transaction(C#adbc.pool_name, fun(Worker) ->
 		gen_server:call(Worker, {call, exec_all, [Type,Sql,Flags]},C#adbc.query_timeout)
 	end,C#adbc.query_timeout),
-	resp(C#adbc.key_type,R).
+	resp(C,R).
 
 % exec_all_prepare(Type,Sql,Flags,BindingVals) ->
 % 	exec_all_prepare(default_pool,Type,Sql,Flags,BindingVals).
@@ -235,7 +237,7 @@ exec(C, Sql) ->
 	R = poolboy:transaction(C#adbc.pool_name, fun(Worker) ->
 		gen_server:call(Worker, {call, exec_sql, [Sql]},C#adbc.query_timeout)
 	end,C#adbc.query_timeout),
-	resp(C#adbc.key_type,R).
+	resp(C,R).
 
 % Run a query that has everything in it and uses parameters. Must start with "actor ..."
 exec_param(Sql,BindingVals) ->
@@ -244,7 +246,7 @@ exec_param(C,Sql,BindingVals) ->
 	R = poolboy:transaction(C#adbc.pool_name, fun(Worker) ->
 		gen_server:call(Worker, {call, exec_sql_param, [Sql,fix_binds(BindingVals)]},C#adbc.query_timeout)
 	end,C#adbc.query_timeout),
-	resp(C#adbc.key_type,R).
+	resp(C,R).
 
 prot_version() ->
 	C = #adbc{},
@@ -297,23 +299,21 @@ fix_binds1([H|T]) when is_integer(H) ->
 fix_binds1([]) ->
 	[].
 
-resp(R) ->
-	resp(atom,R).
-resp(KeyType,{ok,R}) ->
-	case resp(KeyType,R) of
+resp(C,{ok,R}) ->
+	case resp(C,R) of
 		{error,E} ->
 			{error,E};
 		_ ->
-			{ok,resp(KeyType,R)}
+			{ok,resp(C,R)}
 	end;
-resp(KeyType,[M|T]) when is_map(M) ->
-	[resp(KeyType,X) || X <- [M|T]];
-resp(atom,M) when is_map(M) ->
-	maps:from_list([{binary_to_atom(K,latin1),resp(V)} || {K,V} <- maps:to_list(M)]);
-resp(binary,M) when is_map(M) ->
-	maps:from_list([{K,resp(V)} || {K,V} <- maps:to_list(M)]);
-resp(list,M) when is_map(M) ->
-	maps:from_list([{binary_to_list(K),resp(V)} || {K,V} <- maps:to_list(M)]);
+resp(C,[M|T]) when is_map(M) ->
+	[resp(C,X) || X <- [M|T]];
+resp(#adbc{key_type = atom} = Cfg,M) when is_map(M) ->
+	maps:from_list([{binary_to_atom(K,latin1),resp(Cfg,V)} || {K,V} <- maps:to_list(M)]);
+resp(#adbc{key_type = binary} = Cfg,M) when is_map(M) ->
+	maps:from_list([{K,resp(Cfg,V)} || {K,V} <- maps:to_list(M)]);
+resp(#adbc{key_type = list} = Cfg,M) when is_map(M) ->
+	maps:from_list([{binary_to_list(K),resp(Cfg,V)} || {K,V} <- maps:to_list(M)]);
 resp(_,#'Val'{bigint = V}) when is_integer(V) ->
 	V;
 resp(_,#'Val'{integer = V}) when is_integer(V) ->
@@ -328,7 +328,9 @@ resp(_,#'Val'{text = V}) when is_binary(V); is_list(V) ->
 	V;
 resp(_,#'Val'{isnull = true}) ->
 	undefined;
-resp(_,#'Val'{blob = V})  when is_binary(V); is_list(V) ->
+resp(#adbc{blob_tuple = true},#'Val'{blob = V})  when is_binary(V); is_list(V) ->
+	{blob, V};
+resp(#adbc{blob_tuple = false},#'Val'{blob = V})  when is_binary(V); is_list(V) ->
 	V;
 resp(TT,#'Result'{rdRes = undefined, wrRes = Write}) ->
 	resp(TT,Write);

@@ -24,7 +24,12 @@ start_children(Pools) ->
 			{worker_module, actordb_client}] ++ SizeArgs,
 		poolboy:child_spec(Name, PoolArgs, WorkerArgs)
 	end, Pools),
-	[{ok,_} = supervisor:start_child(?MODULE, C) || C <- PoolSpecs].
+	[case supervisor:start_child(?MODULE, C) of
+		{ok,_} ->
+			ok;
+		{error,{already_started,_}} ->
+			ok
+	end || C <- PoolSpecs].
 
 %% ===================================================================
 %% Supervisor callbacks
