@@ -355,7 +355,7 @@ start_link(Args) ->
 
 init(Args) ->
 	% process_flag(trap_exit, true),
-	random:seed(os:timestamp()),
+	rand:seed(exs64),
 	case Args of
 		[{_,_}|_] = Props ->
 			Other = [];
@@ -506,8 +506,9 @@ do_connect(Props) ->
 	Username = proplists:get_value(username, Props),
 	Password = proplists:get_value(password, Props),
 	Port = proplists:get_value(port, Props),
+	Framed = proplists:get_value(framed,Props,false),
 
-	case catch thrift_client_util:new(Hostname, Port, actordb_thrift, []) of
+	case catch thrift_client_util:new(Hostname, Port, actordb_thrift, [{framed,Framed}]) of
 		{ok,C} ->
 			case (catch thrift_client:call(C, salt, [])) of
 				{CS,{ok,Salt}} ->
@@ -535,9 +536,9 @@ do_connect(Props) ->
 randelem(Args) ->
 	case lists:keyfind(crypto,1,application:which_applications()) of
 		false ->
-			Num = random:uniform(1000000);
+			Num = rand:uniform(1000000);
 		_ ->
-			Num = binary:first(crypto:rand_bytes(1))
+			Num = binary:first(crypto:strong_rand_bytes(1))
 	end,
 	lists:nth((Num rem length(Args)) + 1,Args).
 
