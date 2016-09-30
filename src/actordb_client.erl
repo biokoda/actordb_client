@@ -198,7 +198,7 @@ exec_multi(Actors, Type, Sql,Flags) ->
 	exec_multi(#adbc{},Actors,Type,Sql,Flags).
 exec_multi(C,[_|_] = Actors, Type, Sql, Flags) ->
 	R = poolboy:transaction(C#adbc.pool_name, fun(Worker) ->
-		gen_server:call(Worker, {call, exec_multi, [Actors,Type,Sql,Flags]},C#adbc.query_timeout)
+		gen_server:call(Worker, {call, exec_multi, [Actors,tostr(Type),Sql,Flags]},C#adbc.query_timeout)
 	end,C#adbc.query_timeout),
 	resp(C,R).
 
@@ -218,7 +218,7 @@ exec_all(Type,Sql,Flags) ->
 	exec_all(#adbc{},Type,Sql,Flags).
 exec_all(C,Type,Sql,Flags) ->
 	R = poolboy:transaction(C#adbc.pool_name, fun(Worker) ->
-		gen_server:call(Worker, {call, exec_all, [Type,Sql,Flags]},C#adbc.query_timeout)
+		gen_server:call(Worker, {call, exec_all, [tostr(Type),Sql,Flags]},C#adbc.query_timeout)
 	end,C#adbc.query_timeout),
 	resp(C,R).
 
