@@ -445,11 +445,11 @@ handle_info(reconnect,#dp{conn = {error,_}} = P) ->
 	case do_connect(P#dp.hostinfo) of
 		{ok,C} ->
 			{noreply,P#dp{conn = C}};
-		{error,closed} ->
-			self() ! connect_other,
-			{noreply,P#dp{conn = {error,closed}}};
 		{error,E} ->
+			self() ! connect_other,
 			{noreply,P#dp{conn = {error,E}}}
+		% {error,E} ->
+		% 	{noreply,P#dp{conn = {error,E}}}
 	end;
 handle_info(reconnect,P) ->
 	(catch thrift_client:close(P#dp.conn)),
