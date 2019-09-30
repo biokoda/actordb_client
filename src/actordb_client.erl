@@ -447,7 +447,7 @@ handle_call(_Msg, _From, #dp{conn = {error,E}} = P) ->
 handle_call({call, ExecTime,PoolTime, Func,Params}, _From, P) ->
 	TStart = millis(),
 	Result = (catch thrift_client:call(P#dp.conn, Func, Params)),
-	TStop = erlang:monotonic_time(millisecond),
+	TStop = millis(),
 	query_time(TStop - TStart, PoolTime, TStart - ExecTime, _From, Func, Params),
 	case Result of
 		{C,{ok, Reply}} ->
