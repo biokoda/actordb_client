@@ -605,6 +605,7 @@ randelem(Args) ->
 	lists:nth((Num rem length(Args)) + 1,Args).
 
 error1(E) ->
+	log_event("Connection error ~p",[E]),
 	case E of
 		{error,closed} ->
 			{error,connection_failed};
