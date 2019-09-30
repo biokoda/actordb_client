@@ -498,7 +498,8 @@ handle_info(check, P) ->
 			ok;
 		_ when P#dp.rii == 0 ->
 			Me = self(),
-			spawn(fun() -> gen_server:call(Me, {call, actor_types,[]}) end);
+			Time = millis(),
+			spawn(fun() -> gen_server:call(Me, {call, Time, millis() - Time, actor_types,[]}) end);
 		_ ->
 			ok
 	end,
