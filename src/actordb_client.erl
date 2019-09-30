@@ -380,8 +380,9 @@ resp(_,R) ->
 log_event(F) ->
 	log_event(F,[]).
 log_event(F,A) ->
+	Silent = get(silent),
 	case application:get_env(?MODULE,callback) of
-		{ok,Mod} ->
+		{ok,Mod} when Silent /= true ->
 			apply(Mod,connection_event,[F,A]);
 		_ ->
 			ok
@@ -515,6 +516,7 @@ handle_info(reconnect,#dp{conn = {error,_}} = P) ->
 		% 	{noreply,P#dp{conn = {error,E}}}
 	end;
 handle_info(reconnect,P) ->
+	log_event("Connection close"),
 	(catch thrift_client:close(P#dp.conn)),
 	handle_info(reconnect,P#dp{conn = {error,error}});
 handle_info(connect_other,#dp{otherhosts = []} = P) ->
@@ -557,6 +559,7 @@ code_change(_OldVsn, State, _Extra) ->
 tryconn(Props) ->
 	{Pid,_} = spawn_monitor(fun() ->
 		timer:sleep(1000),
+		put(silent,true),
 		exit(do_connect(Props))
 	end),
 	Pid.
@@ -570,7 +573,7 @@ do_connect(Props) ->
 	Password = proplists:get_value(password, Props),
 	Port = proplists:get_value(port, Props),
 	Framed = proplists:get_value(framed,Props,false),
-
+	log_event("do_connect start ~p",[Hostname]),
 	case catch thrift_client_util:new(Hostname, Port, actordb_thrift, [{framed,Framed}]) of
 		{ok,C} ->
 			case (catch thrift_client:call(C, salt, [])) of
@@ -579,20 +582,27 @@ do_connect(Props) ->
 					<<Num2:160>> = crypto:hash(sha, <<Salt/binary, (crypto:hash(sha, HashBin))/binary>>),
 					case catch thrift_client:call(CS, login, [Username,<<(Num1 bxor Num2):160>>]) of
 						{C1,{ok,_}} ->
+							log_event("do_connect connected",[]),
 							{ok,C1};
 						{_,{error,Err}} when Err == closed; Err == econnrefused ->
+							log_event("do_connect ~p",[Err]),
 							{error,closed};
 						{_,{exception,Msg}} ->
+							log_event("do_connect ~p",[Msg]),
 							{error,Msg};
 						{_,Err} ->
+							log_event("do_connect ~p",[Err]),
 							{error,Err}
 					end;
 				{_,{error,Err}} when Err == closed; Err == econnrefused ->
+					log_event("do_connect ~p",[Err]),
 					{error,closed}
 			end;
 		{error,econnrefused} ->
+			log_event("do_connect ~p",[econnrefused]),
 			{error,closed};
 		{_,{error,Err}} when Err == closed; Err == econnrefused ->
+			log_event("do_connect ~p",[Err]),
 			{error,closed}
 	end.
 
