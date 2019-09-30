@@ -478,7 +478,8 @@ handle_call({call, ExecTime,PoolTime, Func,Params}, _From, P) ->
 			self() ! reconnect,
 			log_event("reconnecting to db due to error"),
 			{reply, error1({error,E}), P#dp{conn = {error,E}, rii = P#dp.rii+1}};
-		{'EXIT',{badarg,_}} ->
+		{'EXIT',{badarg,_Badarg}} ->
+			log_event("badarg ~p",[_Badarg]),
 			{reply,badarg,P#dp{rii = P#dp.rii+1}}
 	end;
 handle_call(status,_,P) ->
