@@ -429,7 +429,14 @@ init(Args) ->
 	end.
 
 millis() ->
-	erlang:monotonic_time(millisecond).
+	case erlang:system_info(otp_release) of
+		"1"++_ ->
+			{MS,S,MIS} = os:timestamp(),
+			(MS*1000000000000 + S*1000000 + MIS) div 1000;
+		_ ->
+			erlang:monotonic_time(millisecond)
+	end.
+
 
 handle_call(stop,_,P) ->
 	{stop,normal,P};
