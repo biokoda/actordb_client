@@ -514,8 +514,8 @@ doqueue(#dp{conn = {error,_}} = P) ->
 doqueue(P) ->
 	Now = millis(),
 	case queue:out(P#dp.callqueue) of
-		empty ->
-			P;
+		{empty,Q} ->
+			P#dp{callqueue = Q};
 		{{value,{{From,_},Msg}},CQ} when element(4,Msg) < Now ->
 			log_event("query timeout ~p",[From]),
 			% Timed out already
