@@ -460,10 +460,10 @@ millis() ->
 
 handle_call(stop,_,P) ->
 	{stop,normal,P};
-handle_call(Msg, From, #dp{conn = {error,E}} = P) ->
+handle_call(_Msg, _From, #dp{conn = {error,E}} = P) ->
 	% We might delay response a bit for max 1s to see if we can reconnect?
-	% {reply,error1({error,E}),P};
-	{noreply,P#dp{callqueue = queue:in({From,Msg},P#dp.callqueue)}};
+	{reply,error1({error,E}),P};
+	% {noreply,P#dp{callqueue = queue:in({_From,_Msg},P#dp.callqueue)}};
 handle_call({call, ExecTime,PoolTime,TimeValid, Func,Params}, _From, P) ->
 	TStart = millis(),
 	Result = (catch thrift_client:call(P#dp.conn, Func, Params)),
