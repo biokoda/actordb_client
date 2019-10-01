@@ -495,7 +495,7 @@ handle_call({call, ExecTime,PoolTime,TimeValid, Func,Params}, _From, P) ->
 		{error,E} ->
 			(catch thrift_client:close(P#dp.conn)),
 			self() ! reconnect,
-			log_event("reconnecting to db due to error"),
+			log_event("reconnecting to db due to error ~p",[E]),
 			{reply, error1({error,E}), P#dp{conn = {error,E}, rii = P#dp.rii+1}};
 		{'EXIT',{badarg,_Badarg}} ->
 			log_event("badarg ~p",[_Badarg]),
@@ -611,7 +611,7 @@ do_connect(Props) ->
 	Port = proplists:get_value(port, Props),
 	Framed = proplists:get_value(framed,Props,false),
 	log_event("do_connect start ~p",[Hostname]),
-	case catch thrift_client_util:new(Hostname, Port, actordb_thrift, [{framed,Framed},{recv_timeout, 10000},{connect_timeout,300}]) of
+	case catch thrift_client_util:new(Hostname, Port, actordb_thrift, [{framed,Framed},{recv_timeout, 10000},{connect_timeout,1000}]) of
 		{ok,C} ->
 			case (catch thrift_client:call(C, salt, [])) of
 				{CS,{ok,Salt}} ->
@@ -639,6 +639,9 @@ do_connect(Props) ->
 			log_event("do_connect ~p",[econnrefused]),
 			{error,closed};
 		{_,{error,Err}} when Err == closed; Err == econnrefused ->
+			log_event("do_connect ~p",[Err]),
+			{error,closed};
+		Err ->
 			log_event("do_connect ~p",[Err]),
 			{error,closed}
 	end.
