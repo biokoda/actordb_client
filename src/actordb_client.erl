@@ -76,7 +76,7 @@ start([{_Poolname,_PoolParams, _WorkerParams}|_] =  Pools) ->
 
 set_trace_callback(Mod) when is_atom(Mod) ->
 	application:set_env(?MODULE,callback,Mod).
--record(adbc,{key_type = atom, pool_name = default_pool, query_timeout = infinity, blob_tuple = false}).
+-record(adbc,{key_type = atom, pool_name = default_pool, query_timeout = 15000, blob_tuple = false}).
 
 % Optional config.
 config() ->
@@ -100,10 +100,11 @@ exec_config(Sql) ->
 	exec_config(#adbc{},Sql).
 exec_config(C, Sql) ->
 	Start = millis(),
+	TO = C#adbc.query_timeout,
 	R = poolboy:transaction(C#adbc.pool_name, fun(Worker) ->
 		Pool = millis(),
-		gen_server:call(Worker, {call, Pool, Pool-Start, exec_config, [Sql]}, C#adbc.query_timeout)
-	end, C#adbc.query_timeout),
+		gen_server:call(Worker, {call, Pool, Pool-Start, Pool+TO, exec_config, [Sql]}, TO)
+	end, TO),
 	resp(C,R).
 
 % Get a unique integer id from db.
@@ -111,20 +112,22 @@ uniqid() ->
 	uniqid(#adbc{}).
 uniqid(C) ->
 	Start = millis(),
+	TO = C#adbc.query_timeout,
 	poolboy:transaction(C#adbc.pool_name, fun(Worker) ->
 		Pool = millis(),
-		gen_server:call(Worker, {call, Pool, Pool-Start, uniqid, []}, C#adbc.query_timeout)
-	end,C#adbc.query_timeout).
+		gen_server:call(Worker, {call, Pool, Pool-Start, Pool+TO, uniqid, []}, TO)
+	end,TO).
 
 % Returns list of actor types 
 actor_types() ->
 	actor_types(#adbc{}).
 actor_types(C) ->
 	Start = millis(),
+	TO = C#adbc.query_timeout,
 	poolboy:transaction(C#adbc.pool_name, fun(Worker) ->
 		Pool = millis(),
-		gen_server:call(Worker, {call, Pool, Pool-Start, actor_types, []}, C#adbc.query_timeout)
-	end,C#adbc.query_timeout).
+		gen_server:call(Worker, {call, Pool, Pool-Start, Pool+TO, actor_types, []}, TO)
+	end,TO).
 
 % For an actor type, return list of tables in schema
 actor_tables(ActorType) ->
@@ -133,10 +136,11 @@ actor_tables(C,ActorType) when is_atom(ActorType) ->
 	actor_tables(C,atom_to_binary(ActorType,utf8));
 actor_tables(C,ActorType) ->
 	Start = millis(),
+	TO = C#adbc.query_timeout,
 	poolboy:transaction(C#adbc.pool_name, fun(Worker) ->
 		Pool = millis(),
-		gen_server:call(Worker, {call, Pool, Pool-Start, actor_tables, [ActorType]}, C#adbc.query_timeout)
-	end,C#adbc.query_timeout).
+		gen_server:call(Worker, {call, Pool, Pool-Start, Pool+TO, actor_tables, [ActorType]}, TO)
+	end,TO).
 
 % For actor type and table, which columns it has
 actor_columns(ActorType, Table) ->
@@ -147,10 +151,11 @@ actor_columns(C, ActorType, Table) when is_atom(Table) ->
 	actor_columns(C,ActorType,atom_to_binary(Table,utf8));
 actor_columns(C,ActorType, Table) ->
 	Start = millis(),
+	TO = C#adbc.query_timeout,
 	poolboy:transaction(C#adbc.pool_name, fun(Worker) ->
 		Pool = millis(),
-		gen_server:call(Worker, {call, Pool, Pool-Start, actor_columns, [ActorType, Table]}, C#adbc.query_timeout)
-	end,C#adbc.query_timeout).
+		gen_server:call(Worker, {call, Pool, Pool-Start,Pool+TO, actor_columns, [ActorType, Table]}, TO)
+	end,TO).
 
 % Get salt for safer login. This way password never gets sent over the wire.
 % Then use it like so:
@@ -159,10 +164,11 @@ salt() ->
 	salt(#adbc{}).
 salt(C) ->
 	Start = millis(),
+	TO = C#adbc.query_timeout,
 	R = poolboy:transaction(C#adbc.pool_name, fun(Worker) ->
 		Pool = millis(),
-		gen_server:call(Worker, {call, Pool, Pool-Start, salt, []}, C#adbc.query_timeout)
-	end,C#adbc.query_timeout),
+		gen_server:call(Worker, {call, Pool, Pool-Start, Pool+TO, salt, []}, TO)
+	end,TO),
 	resp(C,R).
 
 % Change schema. Must be logged in as root user.
@@ -170,10 +176,11 @@ exec_schema(Sql) ->
 	exec_schema(#adbc{},Sql).
 exec_schema(C,Sql) ->
 	Start = millis(),
+	TO = C#adbc.query_timeout,
 	R = poolboy:transaction(C#adbc.pool_name, fun(Worker) ->
 		Pool = millis(),
-		gen_server:call(Worker, {call, Pool, Pool-Start, exec_schema, [Sql]}, C#adbc.query_timeout)
-	end,C#adbc.query_timeout),
+		gen_server:call(Worker, {call, Pool, Pool-Start, Pool+TO, exec_schema, [Sql]}, TO)
+	end,TO),
 	resp(C,R).
 
 % Run query on an actor.
@@ -185,10 +192,11 @@ exec_single(Actor,Type,Sql,Flags) ->
 	exec_single(#adbc{},Actor,Type,Sql,Flags).
 exec_single(C,Actor,Type,Sql,Flags) ->
 	Start = millis(),
+	TO = C#adbc.query_timeout,
 	R = poolboy:transaction(C#adbc.pool_name, fun(Worker) ->
 		Pool = millis(),
-		gen_server:call(Worker, {call, Pool, Pool-Start, exec_single, [Actor,tostr(Type),Sql,flags(Flags)]}, C#adbc.query_timeout)
-	end,C#adbc.query_timeout),
+		gen_server:call(Worker, {call, Pool, Pool-Start,Pool+TO, exec_single, [Actor,tostr(Type),Sql,flags(Flags)]}, TO)
+	end,TO),
 	resp(C,R).
 
 % Run query on an actor and use parameterized values. This is safer and faster.
@@ -202,11 +210,12 @@ exec_single_param(Actor,Type,Sql,Flags,BindingVals) ->
 	exec_single_param(#adbc{},Actor,Type,Sql,Flags,BindingVals).
 exec_single_param(C,Actor,Type,Sql,Flags,BindingVals) ->
 	Start = millis(),
+	TO = C#adbc.query_timeout,
 	R = poolboy:transaction(C#adbc.pool_name, fun(Worker) ->
 		Pool = millis(),
 		gen_server:call(Worker, 
-			{call, Pool, Pool-Start, exec_single_param, [Actor,tostr(Type),Sql,flags(Flags),fix_binds(BindingVals)]},C#adbc.query_timeout)
-	end,C#adbc.query_timeout),
+			{call, Pool, Pool-Start,Pool+TO, exec_single_param, [Actor,tostr(Type),Sql,flags(Flags),fix_binds(BindingVals)]},TO)
+	end,TO),
 	resp(C,R).
 
 % Run a query over multiple actors.
@@ -218,10 +227,11 @@ exec_multi(Actors, Type, Sql,Flags) ->
 	exec_multi(#adbc{},Actors,Type,Sql,Flags).
 exec_multi(C,[_|_] = Actors, Type, Sql, Flags) ->
 	Start = millis(),
+	TO = C#adbc.query_timeout,
 	R = poolboy:transaction(C#adbc.pool_name, fun(Worker) ->
 		Pool = millis(),
-		gen_server:call(Worker, {call, Pool, Pool-Start, exec_multi, [Actors,tostr(Type),Sql,Flags]},C#adbc.query_timeout)
-	end,C#adbc.query_timeout),
+		gen_server:call(Worker, {call, Pool, Pool-Start,Pool+TO, exec_multi, [Actors,tostr(Type),Sql,Flags]},TO)
+	end,TO),
 	resp(C,R).
 
 % exec_multi_prepare(Actors, Type, Sql,Flags,BindingVals) ->
@@ -240,10 +250,11 @@ exec_all(Type,Sql,Flags) ->
 	exec_all(#adbc{},Type,Sql,Flags).
 exec_all(C,Type,Sql,Flags) ->
 	Start = millis(),
+	TO = C#adbc.query_timeout,
 	R = poolboy:transaction(C#adbc.pool_name, fun(Worker) ->
 		Pool = millis(),
-		gen_server:call(Worker, {call, Pool, Pool-Start, exec_all, [tostr(Type),Sql,Flags]},C#adbc.query_timeout)
-	end,C#adbc.query_timeout),
+		gen_server:call(Worker, {call, Pool, Pool-Start,Pool+TO, exec_all, [tostr(Type),Sql,Flags]},TO)
+	end,TO),
 	resp(C,R).
 
 % exec_all_prepare(Type,Sql,Flags,BindingVals) ->
@@ -259,10 +270,11 @@ exec(Sql) ->
 	exec(#adbc{},Sql).
 exec(C, Sql) ->
 	Start = millis(),
+	TO = C#adbc.query_timeout,
 	R = poolboy:transaction(C#adbc.pool_name, fun(Worker) ->
 		Pool = millis(),
-		gen_server:call(Worker, {call, Pool, Pool-Start, exec_sql, [Sql]},C#adbc.query_timeout)
-	end,C#adbc.query_timeout),
+		gen_server:call(Worker, {call, Pool, Pool-Start,Pool+TO, exec_sql, [Sql]},TO)
+	end,TO),
 	resp(C,R).
 
 % Run a query that has everything in it and uses parameters. Must start with "actor ..."
@@ -270,19 +282,21 @@ exec_param(Sql,BindingVals) ->
 	exec_param(#adbc{},Sql,BindingVals).
 exec_param(C,Sql,BindingVals) ->
 	Start = millis(),
+	TO = C#adbc.query_timeout,
 	R = poolboy:transaction(C#adbc.pool_name, fun(Worker) ->
 		Pool = millis(),
-		gen_server:call(Worker, {call, Pool, Pool-Start, exec_sql_param, [Sql,fix_binds(BindingVals)]},C#adbc.query_timeout)
-	end,C#adbc.query_timeout),
+		gen_server:call(Worker, {call, Pool, Pool-Start,Pool+TO, exec_sql_param, [Sql,fix_binds(BindingVals)]},TO)
+	end,TO),
 	resp(C,R).
 
 prot_version() ->
 	C = #adbc{},
 	Start = millis(),
+	TO = C#adbc.query_timeout,
 	poolboy:transaction(C#adbc.pool_name, fun(Worker) ->
 		Pool = millis(),
-		gen_server:call(Worker, {call, Pool, Pool-Start, protocolVersion, []},C#adbc.query_timeout)
-	end,C#adbc.query_timeout).
+		gen_server:call(Worker, {call, Pool, Pool-Start,Pool+TO, protocolVersion, []},TO)
+	end,TO).
 
 tostr(H) when is_atom(H) ->
 	atom_to_binary(H,latin1);
@@ -441,11 +455,11 @@ millis() ->
 
 handle_call(stop,_,P) ->
 	{stop,normal,P};
-handle_call(_Msg, _From, #dp{conn = {error,E}} = P) ->
+handle_call(Msg, From, #dp{conn = {error,E}} = P) ->
 	% We might delay response a bit for max 1s to see if we can reconnect?
-	{reply,error1({error,E}),P};
-	% {noreply,P#dp{callqueue = queue:in_r({From,Msg},P#dp.callqueue)}};
-handle_call({call, ExecTime,PoolTime, Func,Params}, _From, P) ->
+	% {reply,error1({error,E}),P};
+	{noreply,P#dp{callqueue = queue:in({From,Msg},P#dp.callqueue)}};
+handle_call({call, ExecTime,PoolTime,TimeValid, Func,Params}, _From, P) ->
 	TStart = millis(),
 	Result = (catch thrift_client:call(P#dp.conn, Func, Params)),
 	TStop = millis(),
@@ -490,6 +504,23 @@ handle_call(status,_,P) ->
 			{reply,ok,P}
 	end.
 
+doqueue(#dp{conn = {error,_}} = P) ->
+	P;
+doqueue(P) ->
+	Now = millis(),
+	case queue:out(P#dp.callqueue) of
+		empty ->
+			P;
+		{{value,{{From,_},Msg}},CQ} when element(4,Msg) < Now ->
+			log_event("query timeout ~p",[From]),
+			% Timed out already
+			doqueue(P#dp{callqueue = CQ});
+		{{value,{From,Msg}},CQ} ->
+			{reply,Resp,NP} = handle_call(Msg,From,P#dp{callqueue = CQ}),
+			gen_server:reply(From,Resp),
+			doqueue(NP)
+	end.
+
 handle_cast(_Msg, State) ->
 	{noreply, State}.
 
@@ -501,7 +532,7 @@ handle_info(check, P) ->
 		_ when P#dp.rii == 0 ->
 			Me = self(),
 			Time = millis(),
-			spawn(fun() -> gen_server:call(Me, {call, Time, millis() - Time, actor_types,[]}) end);
+			spawn(fun() -> gen_server:call(Me, {call, Time, millis() - Time,Time+1000, actor_types,[]}) end);
 		_ ->
 			ok
 	end,
@@ -509,7 +540,7 @@ handle_info(check, P) ->
 handle_info(reconnect,#dp{conn = {error,_}} = P) ->
 	case do_connect(P#dp.hostinfo) of
 		{ok,C} ->
-			{noreply,P#dp{conn = C}};
+			{noreply,doqueue(P#dp{conn = C})};
 		{error,E} ->
 			self() ! connect_other,
 			{noreply,P#dp{conn = {error,E}}}
@@ -534,7 +565,7 @@ handle_info(connect_other, #dp{conn = {error,_}} = P) ->
 		{ok,C} ->
 			% We found a new connection to some other host.
 			% Still periodically try to reconnect to original host if it comes back up.
-			{noreply,P#dp{conn = C, tryconn = tryconn(P#dp.hostinfo)}}
+			{noreply,doqueue(P#dp{conn = C, tryconn = tryconn(P#dp.hostinfo)})}
 	end;
 handle_info(connect_other,P) ->
 	{noreply,P};
@@ -575,7 +606,7 @@ do_connect(Props) ->
 	Port = proplists:get_value(port, Props),
 	Framed = proplists:get_value(framed,Props,false),
 	log_event("do_connect start ~p",[Hostname]),
-	case catch thrift_client_util:new(Hostname, Port, actordb_thrift, [{framed,Framed}]) of
+	case catch thrift_client_util:new(Hostname, Port, actordb_thrift, [{framed,Framed},{recv_timeout, 10000},{connect_timeout,300}]) of
 		{ok,C} ->
 			case (catch thrift_client:call(C, salt, [])) of
 				{CS,{ok,Salt}} ->
