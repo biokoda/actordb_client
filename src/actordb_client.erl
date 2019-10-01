@@ -90,9 +90,9 @@ config([{_,_}|_] = L) when is_list(L) ->
 config(PoolName) ->
 	#adbc{pool_name = PoolName}.
 config(PoolName, QueryTimeout) ->
-	#adbc{pool_name = PoolName, query_timeout = QueryTimeout}.
+	#adbc{pool_name = PoolName, query_timeout = qt(QueryTimeout)}.
 config(PoolName, QueryTimeout, KeyType) ->
-	#adbc{pool_name = PoolName, query_timeout = QueryTimeout, key_type = KeyType}.
+	#adbc{pool_name = PoolName, query_timeout = qt(QueryTimeout), key_type = KeyType}.
 
 qt(N) when is_integer(N) ->
 	N;
