@@ -86,13 +86,18 @@ config([{_,_}|_] = L) when is_list(L) ->
 	#adbc{pool_name = proplists:get_value(pool_name, L, Def#adbc.pool_name),
 		key_type = proplists:get_value(key_type, L, Def#adbc.key_type),
 		blob_tuple = proplists:get_value(blob_tuple, L, Def#adbc.blob_tuple),
-		query_timeout = proplists:get_value(query_timeout, L, Def#adbc.query_timeout)};
+		query_timeout = qt(proplists:get_value(query_timeout, L, Def#adbc.query_timeout))};
 config(PoolName) ->
 	#adbc{pool_name = PoolName}.
 config(PoolName, QueryTimeout) ->
 	#adbc{pool_name = PoolName, query_timeout = QueryTimeout}.
 config(PoolName, QueryTimeout, KeyType) ->
 	#adbc{pool_name = PoolName, query_timeout = QueryTimeout, key_type = KeyType}.
+
+qt(N) when is_integer(N) ->
+	N;
+qt(_) ->
+	(#adbc{})#adbc.query_timeout.
 
 % Exec query on config database. Queries will work only when logged in with a root user account
 % or if database is uninitalized.
