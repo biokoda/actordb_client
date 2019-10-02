@@ -497,8 +497,8 @@ handle_call({call, ExecTime,PoolTime,TimeValid, Func,Params}, _From, P) ->
 			self() ! reconnect,
 			log_event("reconnecting to db due to error ~p",[E]),
 			{reply, error1({error,E}), P#dp{conn = {error,E}, rii = P#dp.rii+1}};
-		{'EXIT',{badarg,_Badarg}} ->
-			log_event("badarg ~p",[_Badarg]),
+		{'EXIT',Err} ->
+			log_event("exit exception ~p",[Err]),
 			{reply,badarg,P#dp{rii = P#dp.rii+1}}
 	end;
 handle_call(status,_,P) ->
@@ -631,7 +631,7 @@ do_connect(Props) ->
 							log_event("do_connect ~p",[Err]),
 							{error,Err}
 					end;
-				{_,{error,Err}} when Err == closed; Err == econnrefused ->
+				Err -> %when Err == closed; Err == econnrefused ->
 					log_event("do_connect ~p",[Err]),
 					{error,closed}
 			end;
